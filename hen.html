@@ -19,7 +19,7 @@
   --bg:#FFF4EE; --surface:#FFFFFF; --sunk:#FCE9E1; --ink:#3A2A3F; --muted:#8C7A8E; --line:#F1DCD3;
   --accent:#EE7FA0; --accent-ink:#FFFFFF; --accent-soft:#FFDCE6; --mint:#BFE8D8; --mint-ink:#2F7F63;
   --butter:#FFEBA8; --warn:#C98424; --bad:#D9556F; --lilac:#DCD0F7;
-  --heat0:#FCE9E1; --heat1:#6CC4A4;
+  --heat0:#FCE9E1; --heat1:#6CC4A4; --busy-bg:rgba(217,85,111,.14);
   --shadow:0 6px 20px rgba(196,120,140,.14);
   --f-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif; --f-body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
@@ -27,7 +27,7 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#211A29; --surface:#2C2336; --sunk:#372C43; --ink:#F6EAF2; --muted:#B5A3BA; --line:#43364F;
   --accent:#F49AB6; --accent-ink:#2A1A26; --accent-soft:#4A2E40; --mint:#2F4D45; --mint-ink:#7FD3B2;
-  --butter:#4D4430; --warn:#F0C46A; --bad:#F48C9F; --lilac:#3E3560; --heat0:#372C43; --heat1:#3E9C7C;
+  --butter:#4D4430; --warn:#F0C46A; --bad:#F48C9F; --lilac:#3E3560; --heat0:#372C43; --heat1:#3E9C7C; --busy-bg:rgba(244,140,159,.18);
   --shadow:0 6px 20px rgba(0,0,0,.35); color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
@@ -75,6 +75,8 @@ h1{font-size:30px}
 .cell .me{position:absolute;top:6px;right:8px;font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px}
 .cell.yes{border-color:var(--mint-ink)} .cell.yes .me{background:var(--mint-ink);color:var(--surface)}
 .cell.maybe{border-color:var(--warn);border-style:dashed} .cell.maybe .me{background:var(--warn);color:var(--surface)}
+.cell.busy{border-color:var(--bad);background-image:repeating-linear-gradient(135deg,var(--busy-bg) 0 8px,transparent 8px 16px)!important} .cell.busy .me{background:var(--bad);color:var(--surface)}
+.busy-t{color:var(--bad);font-weight:600}
 .cell.top{box-shadow:0 0 0 3px var(--accent)}
 .cell.pick{box-shadow:0 0 0 4px var(--ink)}
 .cell:disabled{opacity:.45;cursor:default}
@@ -135,6 +137,8 @@ const myKey = store.get('hct_hen_key',null) || (()=>{ const k=newKey(); store.se
 let me = { name: store.get('hct_hen_name',''), slots:{}, foods:new Set(), note:'' };
 let M = null, dirty = false, saving = false, sb = null, mine = null, viewWeek = null, hasSession = false;
 const mondayOf = k => { const d=new Date(k+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dayKey(d); };
+const encSlot = (k,v) => v==='maybe'?'?'+k : v==='busy'?'!'+k : k;
+const decSlot = s => s[0]==='?'?[s.slice(1),'maybe'] : s[0]==='!'?[s.slice(1),'busy'] : [s,'yes'];
 const MAX_WEEKS = 8;   // xem trước tối đa 8 tuần
 const weekBounds = () => { const min=mondayOf(dayKey(new Date())); return {min, max:addDays(min,7*MAX_WEEKS)}; };
 const weekName = wk => { const d=Math.round((new Date(wk+'T12:00:00')-new Date(weekBounds().min+'T12:00:00'))/864e5/7); return d===0?'Tuần này':d===1?'Tuần sau':d+' tuần nữa'; };
@@ -161,20 +165,20 @@ async function load(first){
 function syncMine(){
   mine = (M.votes||[]).find(v=>me.name && v.name.toLowerCase()===me.name.toLowerCase()) || null;
   me.slots={}; me.foods=new Set(); me.note='';
-  if(mine){ (mine.slots||[]).forEach(s=>{ if(s[0]==='?') me.slots[s.slice(1)]='maybe'; else me.slots[s]='yes'; }); (mine.foods||[]).forEach(f=>me.foods.add(f)); me.note=mine.note||''; }
+  if(mine){ (mine.slots||[]).forEach(s=>{ const [k,v]=decSlot(s); me.slots[k]=v; }); (mine.foods||[]).forEach(f=>me.foods.add(f)); me.note=mine.note||''; }
 }
 function tally(){
   const t={}, votes=(M.votes||[]).filter(v=>!(mine && me.name && v.name.toLowerCase()===me.name.toLowerCase()));
   const all=[...votes];
-  if(me.name) all.push({name:me.name,slots:Object.entries(me.slots).map(([k,v])=>v==='maybe'?'?'+k:k),foods:[...me.foods],note:me.note});
-  all.forEach(v=>(v.slots||[]).forEach(s=>{ const maybe=s[0]==='?', k=maybe?s.slice(1):s; const o=t[k]||(t[k]={yes:[],maybe:[]}); (maybe?o.maybe:o.yes).push(v.name); }));
+  if(me.name) all.push({name:me.name,slots:Object.entries(me.slots).map(([k,v])=>encSlot(k,v)),foods:[...me.foods],note:me.note});
+  all.forEach(v=>(v.slots||[]).forEach(s=>{ const [k,st]=decSlot(s); const o=t[k]||(t[k]={yes:[],maybe:[],busy:[]}); o[st].push(v.name); }));
   return {t,all};
 }
 function render(){
   const {t,all}=tally(), n=all.length, week=[...Array(7)].map((_,i)=>addDays(viewWeek,i)), today=dayKey(new Date());
   const wb=weekBounds(), weeks=[]; for(let w=wb.min; w<=wb.max; w=addDays(w,7)) weeks.push(w);
-  const perWeek={}; Object.entries(t).forEach(([k,o])=>{ const w=mondayOf(k.split('|')[0]); (perWeek[w]=perWeek[w]||new Set()); o.yes.concat(o.maybe).forEach(x=>perWeek[w].add(x)); });
-  const ranked=Object.entries(t).map(([k,o])=>({k,...o,score:o.yes.length+o.maybe.length*0.5})).filter(o=>o.score>0 && o.k.split('|')[0]>=today)
+  const perWeek={}; Object.entries(t).forEach(([k,o])=>{ const w=mondayOf(k.split('|')[0]); (perWeek[w]=perWeek[w]||new Set()); o.yes.concat(o.maybe,o.busy).forEach(x=>perWeek[w].add(x)); });
+  const ranked=Object.entries(t).map(([k,o])=>({k,...o,score:o.yes.length+o.maybe.length*0.5-o.busy.length*0.75})).filter(o=>(o.yes.length||o.maybe.length) && o.score>0 && o.k.split('|')[0]>=today)
     .sort((a,b)=>b.score-a.score||b.yes.length-a.yes.length||a.k.localeCompare(b.k)).slice(0,3);
   const topKey=ranked[0]&&ranked[0].k;
   const foodOpts=[...(M.foods||[])]; const extra=new Set();
@@ -200,7 +204,7 @@ function render(){
     ${me.name?'':'<p class="lbl">Nhập tên rồi chạm vào các ô bên dưới để báo giờ bạn rảnh.</p>'}
   </section>
   ${ranked.length?`<section class="card"><h2>Khung giờ hợp nhất</h2><div class="best">${ranked.map((o,i)=>`<div class="best-i"><span class="rank ${o.yes.length===n&&n>1?'full':''}">${i+1}</span>
-      <div><b>${esc(slotLabel(o.k))}</b><small>${o.yes.length===n&&n>1?'Cả đám đều rảnh · ':''}${esc(o.yes.join(', '))}${o.maybe.length?' · có thể: '+esc(o.maybe.join(', ')):''}</small></div>
+      <div><b>${esc(slotLabel(o.k))}</b><small>${o.yes.length===n&&n>1?'Cả đám đều rảnh · ':''}${esc(o.yes.join(', '))}${o.maybe.length?' · có thể: '+esc(o.maybe.join(', ')):''}${o.busy.length?' · <span class="busy-t">bận: '+esc(o.busy.join(', '))+'</span>':''}</small></div>
       <b class="num">${o.yes.length}/${n}</b></div>`).join('')}</div></section>`:''}
   <section class="card">
     <h2>Lịch tuần</h2>
@@ -208,17 +212,17 @@ function render(){
       <div><b>${weekName(viewWeek)}</b><small class="num">${fmtD(week[0])} – ${fmtD(week[6])}${perWeek[viewWeek]?' · '+perWeek[viewWeek].size+' người đã chọn':''}</small></div>
       <button data-wk="1" aria-label="Tuần sau" ${viewWeek>=wb.max?'disabled':''}>›</button></div>
     <div class="wdots" role="group" aria-label="Chọn tuần">${weeks.map(w=>`<button data-wjump="${w}" aria-pressed="${w===viewWeek}" aria-label="${weekName(w)}${perWeek[w]?', '+perWeek[w].size+' người':''}" title="${weekName(w)}">${perWeek[w]?perWeek[w].size:''}</button>`).join('')}</div>
-    <div class="legend"><span><i style="background:var(--heat1)"></i>nhiều người rảnh</span><span><i style="border:2.5px solid var(--mint-ink)"></i>bạn rảnh</span><span><i style="border:2.5px dashed var(--warn)"></i>bạn có thể</span></div>
-    <p class="lbl" style="margin:0">Chạm một lần: rảnh ✓ · lần hai: có thể ? · lần ba: bỏ.</p>
+    <div class="legend"><span><i style="background:var(--heat1)"></i>nhiều người rảnh</span><span><i style="border:2.5px solid var(--mint-ink)"></i>bạn rảnh</span><span><i style="border:2.5px dashed var(--warn)"></i>bạn có thể</span><span><i style="border:2.5px solid var(--bad);background:var(--busy-bg)"></i>bạn bận</span></div>
+    <p class="lbl" style="margin:0">Chạm lần 1: rảnh ✓ · lần 2: có thể ? · lần 3: bận ✕ · lần 4: bỏ.</p>
     <div class="grid" role="grid" aria-label="Lịch tuần">
       <span></span>${SLOTS.map(s=>`<span class="gh">${s[1]}</span>`).join('')}
       ${week.map(k=>{ const d=new Date(k+'T12:00:00'), past=k<today;
         return `<div class="day${past?' past':''}">${DOW[d.getDay()]}<small>${fmtD(k)}</small></div>`+SLOTS.map(([sl])=>{
-          const key=k+'|'+sl, o=t[key]||{yes:[],maybe:[]}, ratio=n?(o.yes.length+o.maybe.length*0.5)/n:0, my=me.slots[key];
+          const key=k+'|'+sl, o=t[key]||{yes:[],maybe:[],busy:[]}, ratio=n?(o.yes.length+o.maybe.length*0.5)/n:0, my=me.slots[key];
           const bg=`color-mix(in srgb, var(--heat1) ${Math.round(ratio*85)}%, var(--heat0))`;
           return `<button class="cell ${my||''} ${key===topKey?'top':''} ${key===ch?'pick':''}" style="background:${bg}" data-cell="${key}" ${past?'disabled':''} aria-label="${esc(slotLabel(key))}: ${o.yes.length} người rảnh">
-            ${my?`<span class="me">${my==='yes'?'✓':'?'}</span>`:''}<span class="cnt num">${o.yes.length||o.maybe.length?o.yes.length:''}${o.maybe.length?`<small style="font-weight:500"> +${o.maybe.length}?</small>`:''}</span>
-            <span class="who">${esc(o.yes.join(', '))}</span></button>`; }).join(''); }).join('')}
+            ${my?`<span class="me">${my==='yes'?'✓':my==='maybe'?'?':'✕'}</span>`:''}<span class="cnt num">${o.yes.length||o.maybe.length?o.yes.length:''}${o.maybe.length?`<small style="font-weight:500"> +${o.maybe.length}?</small>`:''}</span>
+            <span class="who">${esc(o.yes.join(', '))}${o.busy.length?`<span class="busy-t">${o.yes.length?' · ':''}✕ ${esc(o.busy.join(', '))}</span>`:''}</span></button>`; }).join(''); }).join('')}
     </div>
   </section>
   <section class="card">
@@ -229,7 +233,7 @@ function render(){
     <div class="row"><input id="newfood" class="field" style="flex:1;padding:10px 12px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);font-size:16px;min-width:0" maxlength="40" placeholder="Đề xuất món khác…"><button class="btn ghost" id="addfood">Thêm</button></div>
     <label class="field">Ghi chú của bạn (dị ứng, không ăn được…)<input id="note" value="${esc(me.note)}" maxlength="120" placeholder="vd không ăn hải sản"></label>
   </section>
-  ${n?`<section class="card"><h2>Cả nhóm</h2><div class="people">${all.map(v=>`<div class="p"><span><b>${esc(v.name)}</b>${v.note?` <small>· ${esc(v.note)}</small>`:''}</span><small class="num">${(v.slots||[]).filter(s=>s[0]!=='?').length} khung rảnh</small></div>`).join('')}</div></section>`:''}
+  ${n?`<section class="card"><h2>Cả nhóm</h2><div class="people">${all.map(v=>`<div class="p"><span><b>${esc(v.name)}</b>${v.note?` <small>· ${esc(v.note)}</small>`:''}</span><small class="num">${(v.slots||[]).filter(s=>decSlot(s)[1]==='yes').length} rảnh${(v.slots||[]).some(s=>s[0]==='!')?' · '+(v.slots||[]).filter(s=>s[0]==='!').length+' bận':''}</small></div>`).join('')}</div></section>`:''}
   ${M.is_owner?`<section class="card owner"><h2>Bạn là người tạo hẹn</h2>
     <p class="lbl" style="margin:0">Chốt để cả nhóm thấy giờ và món cuối cùng.</p>
     <div class="row">${ranked.length?`<button class="btn" data-choose="${ranked[0].k}">Chốt ${esc(slotLabel(ranked[0].k))}</button>`:''}${ch?'<button class="btn ghost" data-choose="">Bỏ chốt giờ</button>':''}</div>
@@ -250,7 +254,7 @@ function bind(){
     render(); };
   document.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{
     if(!me.name){ toast('Nhập tên của bạn trước nhé'); $('nm').focus(); return; }
-    const k=b.dataset.cell, cur=me.slots[k]; if(!cur) me.slots[k]='yes'; else if(cur==='yes') me.slots[k]='maybe'; else delete me.slots[k];
+    const k=b.dataset.cell, cur=me.slots[k]; if(!cur) me.slots[k]='yes'; else if(cur==='yes') me.slots[k]='maybe'; else if(cur==='maybe') me.slots[k]='busy'; else delete me.slots[k];
     dirty=true; render(); scheduleSave(); });
   document.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{ const w=addDays(viewWeek,7*+b.dataset.wk), wb=weekBounds(); if(w<wb.min||w>wb.max) return; viewWeek=w; render(); });
   document.querySelectorAll('[data-wjump]').forEach(b=>b.onclick=()=>{ viewWeek=b.dataset.wjump; render(); });
@@ -270,7 +274,8 @@ let saveT=null;
 function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(save,900); updateBar(); }
 function updateBar(){
   const bar=$('savebar'); bar.hidden=!me.name;
-  $('st').textContent = saving?'Đang lưu…':dirty?'Có thay đổi chưa lưu':(mine?'Đã lưu · '+Object.values(me.slots).filter(x=>x==='yes').length+' khung rảnh':'Chạm vào ô để báo giờ rảnh');
+  const ny=Object.values(me.slots).filter(x=>x==='yes').length, nb=Object.values(me.slots).filter(x=>x==='busy').length;
+  $('st').textContent = saving?'Đang lưu…':dirty?'Có thay đổi chưa lưu':(mine?'Đã lưu · '+ny+' khung rảnh'+(nb?', '+nb+' khung bận':''):'Chạm vào ô để báo giờ rảnh');
   $('savebtn').disabled=saving;
 }
 $('savebtn').onclick=()=>{ clearTimeout(saveT); save(); };
@@ -279,7 +284,7 @@ async function save(){
   saving=true; updateBar();
   const today=dayKey(new Date());
   Object.keys(me.slots).forEach(k=>{ if(k.split('|')[0]<today) delete me.slots[k]; });
-  let slots=Object.entries(me.slots).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>v==='maybe'?'?'+k:k);
+  let slots=Object.entries(me.slots).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>encSlot(k,v));
   if(slots.length>40){ slots=slots.slice(0,40); toast('Mỗi người chọn tối đa 40 khung, đã giữ 40 khung gần nhất',3500); }
   const {data,error}=await sb.rpc('hct_meet_vote',{p_token:token,p_name:me.name,p_key:myKey,p_slots:slots,p_foods:[...me.foods],p_note:me.note});
   saving=false;
