@@ -1,0 +1,16 @@
+{
+  "name": "Hũ Chi Tiêu",
+  "short_name": "Hũ Chi Tiêu",
+  "description": "Sổ chi tiêu cá nhân",
+  "lang": "vi",
+  "start_url": "./#tong-quan",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFF4EE",
+  "theme_color": "#FFF4EE",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [{ "name": "Ghi khoản chi", "url": "./#nhap" }]
+}
