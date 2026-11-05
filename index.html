@@ -328,6 +328,19 @@ a.secondary{color:var(--ink);display:block}
 .gate-card h2{font-size:30px}
 .gate-card .field{text-align:left}
 .gate-card .lnk{color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:3px}
+.gate-card .sub{color:var(--muted);font-size:14px;margin-top:-8px}
+.pw{position:relative}.pw input{padding-right:58px}
+.pw .eye{position:absolute;right:6px;bottom:6px;padding:6px 10px;border-radius:10px;font-size:12.5px;color:var(--muted);background:var(--sunk)}
+.gate-card .ok{background:var(--mint);color:var(--ink);border-radius:14px;padding:10px 12px;font-size:13.5px;text-align:left}
+.gate-card .err:not([hidden]){background:var(--sunk);border-radius:14px;padding:10px 12px;text-align:left}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px}.or::before,.or::after{content:'';flex:1;height:1.5px;background:var(--line)}
+.ghost-btn{padding:12px;border-radius:16px;border:1.5px dashed var(--line);font-weight:600;color:var(--ink)}
+.onb{display:flex;flex-direction:column;gap:10px}
+.onb ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.onb li{display:flex;gap:10px;align-items:center;background:var(--sunk);border-radius:14px;padding:10px 12px}
+.onb li .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surface);font-weight:700;flex:none}
+.onb li.done .n{background:var(--mint)} .onb li.done b{text-decoration:line-through;opacity:.6}
+.onb li .t{flex:1;min-width:0;display:flex;flex-direction:column}.onb li small{color:var(--muted);font-size:12.5px}
 .code{letter-spacing:.5em;text-align:center;font-size:24px!important}
 
 @media (min-width:900px){
@@ -387,7 +400,7 @@ a.secondary{color:var(--ink);display:block}
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.05-9';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.05-10';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -439,7 +452,8 @@ const store = {
 function toast(msg,ms=2400){ const t=document.getElementById('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,ms); }
 
 /* ============ trạng thái ============ */
-const DEFAULT_PEOPLE = [{id:'thai',name:'Thái',icon:'👦',color:'lilac'}];
+const DEFAULT_PEOPLE = [];
+const LEGACY_THAI = {id:'thai',name:'Thái',icon:'👦',color:'lilac'};
 const ME = {id:'me',name:'Mình',icon:'🙋',color:'rose'}, CHUNG = {id:'chung',name:'Chung',icon:'🏠',color:'sky'};
 const blankSettings = () => ({cats:DEFAULT_CATS.map(c=>({...c})),learned:{},budgets:{},total:0,people:DEFAULT_PEOPLE.map(x=>({...x}))});
 const blank = () => ({tx:[],recurring:[],jars:[],debts:[],settings:blankSettings()});
@@ -523,7 +537,8 @@ async function pull(){
     if(st.error) throw st.error;
     if(Q.length) return; // có thay đổi mới trong lúc tải, để lần sau
     S.tx=tx.map(clean); S.recurring=rc.map(clean); S.jars=jr.map(clean); S.debts=db.map(clean);
-    if(st.data && st.data.data) S.settings = Object.assign(blankSettings(), st.data.data);
+    if(st.data && st.data.data){ S.settings = Object.assign(blankSettings(), st.data.data);
+      if(!st.data.data.people && S.tx.some(x=>x.who==='thai')) S.settings.people=[{...LEGACY_THAI}]; }
     else enqueue({k:'settings',op:'up',id:'settings'});
     persist(); syncErr=''; lastSync=new Date();
     runRecurring(); render();
@@ -702,7 +717,9 @@ const gearIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const refreshIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`;
 const mobileTop = sub => `<div class="top"><div class="brand"><div class="jar">H</div><h1>Hũ Chi Tiêu<small>${sub}</small></h1></div>
   <div class="top-r"><span class="sync" data-sync><i></i><span>…</span></span><button class="gear" data-act="refresh" aria-label="Tải bản mới nhất" title="Tải bản mới nhất">${refreshIcon}</button><a class="gear" href="#cai-dat" aria-label="Cài đặt">${gearIcon}</a></div></div>`;
-const demoBanner = () => hasSample()?`<div class="demo"><span>Đang hiển thị <b>dữ liệu mẫu</b> để bạn xem thử.</span><button data-act="clear-sample">Xoá dữ liệu mẫu</button></div>`:'';
+const isGuest = () => mode==='local' && !!sb;
+const demoBanner = () => isGuest()?`<div class="demo"><span>Bạn đang <b>dùng thử</b>, dữ liệu chỉ nằm trên máy này.</span><button data-act="go-signup">Tạo tài khoản để lưu</button></div>`
+  : hasSample()?`<div class="demo"><span>Đang hiển thị <b>dữ liệu mẫu</b> để bạn xem thử.</span><button data-act="clear-sample">Xoá dữ liệu mẫu</button></div>`:'';
 function catRows(entries,total,prevMap){
   const max=entries.length?entries[0][1]:1;
   return entries.map(([id,v])=>{ const c=catById(id); let chg='';
@@ -949,9 +966,10 @@ function eatCard(){
     <div class="eat-acts">
       <span class="lbl">${ai?'AI gợi ý'+(ai.provider?' · '+esc(ai.provider==='gemini'?'Gemini':'Groq'):'')+(ai.maps?' · Google Maps':''):'Gợi ý nhanh trên máy'}</span>
       <div class="acts">${eat.group==='nhom'?'<a class="btn-s" href="#hen" style="text-decoration:none">📅 Hẹn nhóm</a>':''}<a class="btn-s ghost" href="#menu" style="text-decoration:none">📖 Menu</a><button class="btn-s ghost" data-eat="reroll" ${eat.loading?'disabled':''}>Đổi món khác</button>
-      ${canAI?`<button class="btn-s" data-eat="ai" ${eat.loading?'disabled':''}>✨ ${ai?'Hỏi lại AI':'Hỏi AI'}</button>`:''}</div></div>
+      ${canAI?`<button class="btn-s" data-eat="ai" ${eat.loading||aiLeft()===0?'disabled':''}>✨ ${aiLeft()===0?'Hết lượt AI hôm nay':(ai?'Hỏi lại AI':'Hỏi AI')+(aiLeft()!=null&&aiLeft()<=5?' · còn '+aiLeft():'')}</button>`:''}</div></div>
   </section>`;
 }
+function aiLeft(){ const q=store.get('hct_aiq',null); return q&&q.day===todayKey()?q.left:null; }
 function eatItems(){ const c=store.get(eatKey(),null); return c && c.reroll===eat.reroll ? c.items : localSuggest(mealBudget().per); }
 async function askAI(){
   if(eat.loading) return;
@@ -980,7 +998,8 @@ async function askAI(){
         hidden:menu.filter(m=>m.hidden).map(m=>m.name).slice(0,20),
         ...(geo?{lat:geo.lat,lng:geo.lng}:{}),note:T.note||''})});
     let d={}; try{ d=await r.json(); }catch(e){}
-    if(!r.ok){ if(d.code==='no_key') aiAvail=false; throw new Error(d.error||('Lỗi '+r.status)); }
+    if(d.quota) store.set('hct_aiq',{day:todayKey(),left:d.quota.left!=null?d.quota.left:Math.max(0,d.quota.limit-d.quota.used),limit:d.quota.limit});
+    if(!r.ok){ if(d.code==='no_key') aiAvail=false; if(d.code==='quota'){ eat.reroll++; } throw new Error(d.error||('Lỗi '+r.status)); }
     eat.reroll++;
     store.set(eatKey(),{items:d.items,tip:d.tip,provider:d.provider,maps:!!d.maps,reroll:eat.reroll,seen:[...exclude,...d.items.map(x=>x.ten)].slice(-15)});
   }catch(e){ toast(e.message||'AI chưa trả lời được, thử lại sau',3500); }
@@ -993,6 +1012,19 @@ async function checkAI(){
 }
 
 /* ============ màn Tổng quan ============ */
+function onboardCard(){
+  if(mode!=='cloud' || store.get('hct_onb',false) || S.tx.filter(x=>!x.sample).length>=5) return '';
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const steps=[
+    [S.tx.some(x=>!x.sample),'Ghi khoản đầu tiên','Gõ như nhắn tin: “phở 50k”, “grab 32k ck hôm qua”','<button class="btn-s" data-open-add>Ghi</button>'],
+    [!!(S.settings.total||Object.values(S.settings.budgets||{}).some(Boolean)),'Đặt ngân sách tháng','Mực canh trong hũ sẽ cho biết đã tiêu bao nhiêu','<a class="btn-s ghost" href="#ke-hoach" style="text-decoration:none">Đặt</a>'],
+    [!!standalone,'Thêm vào màn hình chính','iPhone: Safari → nút Chia sẻ → “Thêm vào MH chính”','']];
+  const nm=userName();
+  return `<section class="card onb"><div class="card-h"><h2>Chào ${nm?esc(nm):'bạn'} 👋</h2><button class="btn-s ghost" data-act="onb-close">Ẩn</button></div>
+    <p class="lbl" style="margin:0">3 bước để bắt đầu:</p>
+    <ol>${steps.map(([done,t,sm,btn],i)=>`<li class="${done?'done':''}"><span class="n">${done?'✓':i+1}</span><div class="t"><b>${t}</b><small>${sm}</small></div>${done?'':btn}</li>`).join('')}</ol></section>`;
+}
+const userName = () => (user && user.user_metadata && user.user_metadata.name) || '';
 function viewHome(){
   const t=todayKey(), mk=monthOf(t), now=new Date(), dom=now.getDate();
   const L=live(), month=L.filter(x=>monthOf(x.date)===mk);
@@ -1022,6 +1054,7 @@ function viewHome(){
 
   return `${mobileTop('Tháng '+(now.getMonth()+1)+'/'+now.getFullYear())}
   ${demoBanner()}
+  ${onboardCard()}
   <button class="quick" data-open-add><span class="plus">＋</span><span>Gõ nhanh, ví dụ “cafe 45k” hoặc “grab 32k ck hôm qua”</span></button>
   <section class="card pot-card"><div class="card-h"><h2>Hũ tháng ${now.getMonth()+1}</h2>${potWhoSeg(month)}</div>
     ${potCard('home-'+mk+'-'+potWho, potWho==='all'?month:month.filter(x=>whoOf(x)===potWho), {level:T?total/T:0.2, state:budgetState(total,T), aria:'Hũ chi tiêu tháng '+(now.getMonth()+1)})}
@@ -1273,7 +1306,7 @@ async function loadHen(){
 }
 function viewHen(){
   if(henList===null || (henErr==='login' && mode==='cloud' && user)){ henList=[]; henErr='loading'; loadHen(); }
-  const msg = henErr==='login' ? `<div class="note"><span>Đăng nhập để tạo link hẹn gửi cho bạn bè. Bạn bè mở link thì không cần tài khoản.</span></div>`
+  const msg = henErr==='login' ? `<div class="note"><span>Đăng nhập để tạo link hẹn gửi cho bạn bè. Bạn bè mở link thì không cần tài khoản.</span>${isGuest()?'<button data-act="go-signup">Tạo tài khoản</button>':''}</div>`
     : henErr==='nosql' ? `<section class="card"><div class="card-h"><h2>Cần cài một lần</h2></div>
         <p>Phần Hẹn ăn cần thêm 2 bảng trên Supabase. Mở Supabase → project <b>luna-cosmetics</b> → <b>SQL Editor</b> → dán đoạn SQL rồi bấm <b>Run</b>.</p>
         <div class="row2"><button class="primary" data-act="hen-sql">Sao chép SQL</button><a class="secondary" style="text-align:center;text-decoration:none" href="https://supabase.com/dashboard/project/aawhgpfmbkjytjuuygwa/sql/new" target="_blank" rel="noopener">Mở SQL Editor</a></div>
@@ -1377,11 +1410,17 @@ function viewPlan(){
 function viewSettings(){
   const cfg=(store.get(LS.cfg,{}).off?{url:'',key:''}:getCfg()), face=store.get(LS.face,null), canFace=!!(window.PublicKeyCredential&&navigator.credentials);
   const cloud = mode==='cloud' ? `
-    <div class="set-row"><div class="t"><b>Tài khoản</b><small>${esc(user?user.email:'')}</small></div><span class="sync" data-sync><i></i><span>…</span></span></div>
+    <div class="set-row"><div class="t"><b>${esc(userName()||'Tài khoản')}</b><small>${esc(user?user.email:'')}</small></div><span class="sync" data-sync><i></i><span>…</span></span></div>
+    <label class="field">Tên hiển thị<input id="acc-name" value="${esc(userName())}" maxlength="40" placeholder="vd Lam" autocomplete="nickname"></label>
+    <div class="field pw">Mật khẩu mới<input id="acc-pw" type="password" autocomplete="new-password" placeholder="Bỏ trống nếu không đổi"><button type="button" class="eye" data-eye="acc-pw">Hiện</button></div>
+    <button class="btn-s" data-act="acc-save" style="align-self:flex-start">Lưu tài khoản</button>
     ${syncErr?`<p class="err">Lỗi gần nhất: ${esc(syncErr)}</p>`:''}
     <div class="set-row"><div class="t"><b>Đồng bộ ngay</b><small>${lastSync?'Lần cuối '+lastSync.toLocaleTimeString('vi-VN'):'Tự đồng bộ khi mở app và khi có mạng'}</small></div><button class="btn-s" data-act="sync-now">Đồng bộ</button></div>
     <div class="set-row"><div class="t"><b>Đăng xuất</b><small>Xoá bản sao trên máy này, dữ liệu vẫn còn trên cloud</small></div><button class="btn-s ghost" data-act="logout">Đăng xuất</button></div>
-    <div class="set-row"><div class="t"><b>Ngắt kết nối Supabase</b><small>Quay về chế độ chỉ trên máy</small></div><button class="btn-s ghost" data-act="cfg-clear">Ngắt</button></div>` : `
+    ` : isGuest() ? `
+    <p class="lbl">Bạn đang <b>dùng thử</b>: dữ liệu chỉ nằm trên máy này. Tạo tài khoản để lưu lên cloud, dùng chung iPhone và máy tính, và mở khoá gợi ý AI, hẹn ăn nhóm. Các khoản bạn đã ghi (trừ dữ liệu mẫu) sẽ được giữ lại.</p>
+    <button class="primary" data-act="go-signup">Tạo tài khoản</button>
+    <button class="btn-s ghost" data-act="go-login" style="align-self:center">Đã có tài khoản? Đăng nhập</button>` : `
     <p class="lbl">Đang lưu <b>chỉ trên máy này</b>. Bấm Kết nối để đồng bộ giữa iPhone và máy tính. Ô trống thì dùng project mặc định.</p>
     <label class="field">Project URL<input id="cfg-url" placeholder="https://xxxx.supabase.co" value="${esc(cfg.url)}" autocomplete="off"></label>
     <label class="field">anon public key<input id="cfg-key" placeholder="eyJhbGciOi…" value="${esc(cfg.key)}" autocomplete="off"></label>
@@ -1391,7 +1430,7 @@ function viewSettings(){
   <div class="page-h"><h2>Cài đặt</h2></div>
   <div class="grid2">
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
-      <section class="card"><div class="card-h"><h2>Kết nối cloud</h2></div>${cloud}</section>
+      <section class="card"><div class="card-h"><h2>${mode==='cloud'||isGuest()?'Tài khoản':'Kết nối cloud'}</h2></div>${cloud}</section>
       <section class="card"><div class="card-h"><h2>Khẩu vị</h2><span class="lbl">${aiAvail?'AI gợi ý món: đang bật':aiAvail===false&&mode==='cloud'?'AI gợi ý món: chưa gắn key':''}</span></div>
         <p class="lbl">Dùng cho thẻ “Hôm nay ăn gì?”. Ngăn cách bằng dấu phẩy.</p>
         <label class="field">Thích ăn<input id="tl" value="${esc((S.settings.taste||{}).likes||'')}" placeholder="vd bún, đồ Hàn, cay"></label>
@@ -1412,7 +1451,7 @@ function viewSettings(){
     </div>
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
     <section class="card"><div class="card-h"><h2>Người trong nhà</h2><button class="btn-s" data-act="ppl-add">＋ Thêm</button></div>
-      <p class="lbl">Gõ “cơm 45k cho ${esc((people()[0]||{name:'Thái'}).name)}” để ghi khoản chi cho người đó. Gõ “chung” cho khoản cả nhà dùng. Mọi khoản vẫn tính vào tổng chi của bạn.</p>
+      <p class="lbl">Gõ “cơm 45k cho ${esc((people()[0]||{name:'em'}).name)}” để ghi khoản chi cho người đó. Gõ “chung” cho khoản cả nhà dùng. Mọi khoản vẫn tính vào tổng chi của bạn.</p>
       <div id="pplist">${people().map(pplRow).join('')}</div>
       <button class="primary" data-act="ppl-save" style="margin-top:8px">Lưu</button></section>
     <section class="card"><div class="card-h"><h2>Danh mục</h2><button class="btn-s" data-act="cat-add">＋ Thêm</button></div>
@@ -1945,62 +1984,78 @@ document.addEventListener('visibilitychange',()=>{
 
 /* ============ đăng nhập bằng email + mật khẩu ============ */
 const appUrl = () => location.origin + location.pathname;
-const authMsg = m => /invalid login/i.test(m)?'Sai email hoặc mật khẩu.'
+const authMsg = m => /invalid login|invalid_credentials/i.test(m)?'Sai email hoặc mật khẩu. Quên mật khẩu thì bấm “Quên mật khẩu?” bên dưới.'
   : /not confirmed/i.test(m)?'Email chưa được xác nhận. Mở hộp thư, bấm link xác nhận rồi đăng nhập lại.'
-  : /already registered|already exists/i.test(m)?'Email này đã có tài khoản. Chuyển sang Đăng nhập.'
-  : /rate limit|too many/i.test(m)?'Gửi quá nhiều lần. Đợi vài phút rồi thử lại.'
+  : /already registered|already exists/i.test(m)?'Email này đã có tài khoản.'
+  : /rate limit|too many|over_email_send/i.test(m)?'Thử quá nhiều lần. Đợi vài phút rồi thử lại.'
+  : /should be different|same_password/i.test(m)?'Mật khẩu mới phải khác mật khẩu cũ.'
   : /at least|weak|password should/i.test(m)?'Mật khẩu cần ít nhất 6 ký tự.'
-  : /signups? not allowed|signup is disabled/i.test(m)?'App không cho tự đăng ký. Tạo tài khoản trong Supabase → Authentication → Users → Add user (tick Auto Confirm), rồi quay lại Đăng nhập.'
+  : /signups? not allowed|signup is disabled|signup_disabled/i.test(m)?'Tạm thời chưa mở đăng ký. Bạn có thể bấm “Dùng thử” để xem app trước.'
+  : /invalid.*email|email.*invalid|email_address_invalid/i.test(m)?'Email này không dùng được, kiểm tra lại giúp mình.'
+  : /failed to fetch|network|load failed/i.test(m)?'Không có mạng hoặc máy chủ chưa trả lời. Kiểm tra mạng rồi thử lại.'
   : m;
-function showLogin(msg, tab){
-  tab = tab || 'in';
+function showLogin(msg, tab, pre){
+  tab = tab || 'in'; pre = pre || {};
   gate.hidden=false;
-  const T={in:['Đăng nhập','Đăng nhập'],up:['Tạo tài khoản','Tạo tài khoản'],reset:['Quên mật khẩu','Gửi link đặt lại']};
-  gate.innerHTML=`<div class="gate-card"><div class="jar">H</div><h2>Hũ Chi Tiêu</h2>
-    ${tab==='reset'?'<p class="lbl">Nhập email, app gửi link để đặt mật khẩu mới.</p>':
-      `<div class="seg" role="group" aria-label="Chọn" style="align-self:center"><button data-lt="in" aria-pressed="${tab==='in'}">Đăng nhập</button><button data-lt="up" aria-pressed="${tab==='up'}">Tạo tài khoản</button></div>`}
-    <label class="field">Email<input id="lg-email" type="email" autocomplete="email" inputmode="email" placeholder="ban@gmail.com"></label>
-    ${tab==='reset'?'':`<label class="field">Mật khẩu<input id="lg-pw" type="password" autocomplete="${tab==='up'?'new-password':'current-password'}" placeholder="Ít nhất 6 ký tự"></label>`}
-    <button class="primary" id="lg-go">${T[tab][1]}</button>
-    <p class="err" id="lg-err" ${msg?'':'hidden'}>${esc(msg||'')}</p>
-    <p class="lbl" id="lg-ok" hidden></p>
-    ${tab==='in'?'<button class="lnk" data-lt="reset">Quên mật khẩu?</button>':tab==='reset'?'<button class="lnk" data-lt="in">Quay lại đăng nhập</button>':''}
-    <button class="lnk" id="lg-cfg">Dùng project Supabase khác</button></div>`;
+  const T={in:'Đăng nhập',up:'Tạo tài khoản',reset:'Gửi link đặt lại'}, W={in:'Đang đăng nhập…',up:'Đang tạo tài khoản…',reset:'Đang gửi…'};
+  const sub={in:'Chào mừng quay lại 👋',up:'Miễn phí. Dùng chung trên iPhone và máy tính.',reset:'Nhập email, app gửi link để đặt mật khẩu mới.'}[tab];
+  gate.innerHTML=`<div class="gate-card"><div class="jar">H</div><h2>${tab==='reset'?'Quên mật khẩu':'Hũ Chi Tiêu'}</h2><p class="sub">${sub}</p>
+    ${tab==='reset'?'':`<div class="seg" role="group" aria-label="Đăng nhập hoặc tạo tài khoản" style="align-self:center"><button data-lt="in" aria-pressed="${tab==='in'}">Đăng nhập</button><button data-lt="up" aria-pressed="${tab==='up'}">Tạo tài khoản</button></div>`}
+    <form id="lg-form" novalidate style="display:flex;flex-direction:column;gap:12px">
+    ${tab==='up'?`<label class="field">Tên của bạn<input id="lg-name" autocomplete="nickname" maxlength="40" placeholder="vd Lam"></label>`:''}
+    <label class="field">Email<input id="lg-email" type="email" autocomplete="${tab==='up'?'email':'username'}" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="ban@gmail.com"></label>
+    ${tab==='reset'?'':`<div class="field pw">Mật khẩu<input id="lg-pw" type="password" autocomplete="${tab==='up'?'new-password':'current-password'}" placeholder="${tab==='up'?'Ít nhất 6 ký tự':'Mật khẩu của bạn'}"><button type="button" class="eye" data-eye="lg-pw">Hiện</button></div>`}
+    <button class="primary" id="lg-go" type="submit">${T[tab]}</button></form>
+    <p class="err" id="lg-err" role="alert" ${msg?'':'hidden'}>${esc(msg||'')}</p>
+    <p class="ok" id="lg-ok" role="status" ${pre.ok?'':'hidden'}>${esc(pre.ok||'')}</p>
+    ${tab==='in'?'<button class="lnk" data-lt="reset">Quên mật khẩu?</button>':tab==='reset'?'<button class="lnk" data-lt="in">Quay lại đăng nhập</button>':'<p class="lbl" style="font-size:12.5px;margin:0">Dữ liệu của bạn chỉ bạn xem được.</p>'}
+    ${tab!=='reset'?`<div class="or">hoặc</div><button class="ghost-btn" id="lg-try">${isGuest()?'Quay lại bản dùng thử':'Dùng thử, không cần tài khoản'}</button>`:''}</div>`;
   const err=t=>{ const e=document.getElementById('lg-err'); e.hidden=!t; e.textContent=t||''; };
   const ok=t=>{ const e=document.getElementById('lg-ok'); e.hidden=!t; e.textContent=t||''; };
-  const emailEl=document.getElementById('lg-email'); emailEl.value=store.get('hct_email','');
-  gate.querySelectorAll('[data-lt]').forEach(b=>b.onclick=()=>showLogin('',b.dataset.lt));
+  const emailEl=document.getElementById('lg-email'); emailEl.value=pre.email||store.get('hct_email','');
+  gate.querySelectorAll('[data-lt]').forEach(b=>b.onclick=()=>showLogin('',b.dataset.lt,{email:emailEl.value.trim()}));
+  const tryBtn=document.getElementById('lg-try'); if(tryBtn) tryBtn.onclick=startGuest;
   const go=document.getElementById('lg-go');
-  const submit=async()=>{
-    const email=emailEl.value.trim(), pwEl=document.getElementById('lg-pw'), password=pwEl?pwEl.value:'';
-    if(!/^\S+@\S+\.\S+$/.test(email)){ err('Email chưa đúng định dạng'); return; }
-    if(tab!=='reset' && password.length<6){ err('Mật khẩu cần ít nhất 6 ký tự'); return; }
-    go.disabled=true; err(''); ok(''); store.set('hct_email',email);
+  const focusEl = tab==='up' ? document.getElementById('lg-name') : (emailEl.value && document.getElementById('lg-pw')) || emailEl;
+  if(matchMedia('(hover:hover)').matches) setTimeout(()=>focusEl&&focusEl.focus(),50);
+  const done=async u=>{ store.del('hct_guest'); mode='cloud'; gate.hidden=true; gate.innerHTML=''; checkAI(); await onLogin(u,true); };
+  document.getElementById('lg-form').onsubmit=async ev=>{
+    ev.preventDefault();
+    const email=emailEl.value.trim().toLowerCase(), pwEl=document.getElementById('lg-pw'), password=pwEl?pwEl.value:'';
+    const nameEl=document.getElementById('lg-name'), name=nameEl?nameEl.value.trim().slice(0,40):'';
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){ err('Email chưa đúng, ví dụ ban@gmail.com'); emailEl.focus(); return; }
+    if(tab!=='reset' && password.length<6){ err('Mật khẩu cần ít nhất 6 ký tự'); pwEl.focus(); return; }
+    go.disabled=true; go.textContent=W[tab]; err(''); ok(''); store.set('hct_email',email);
     try{
       if(tab==='in'){
         const {data,error}=await sb.auth.signInWithPassword({email,password});
         if(error) throw error;
-        gate.hidden=true; gate.innerHTML=''; await onLogin(data.user,true); return;
+        await done(data.user); return;
       }
       if(tab==='up'){
-        const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:appUrl()}});
+        const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:appUrl(),data:name?{name}:{}}});
         if(error) throw error;
-        if(data.session){ gate.hidden=true; gate.innerHTML=''; await onLogin(data.user,true); return; }
         if(data.user && data.user.identities && !data.user.identities.length) throw new Error('already registered');
-        showLogin('', 'in');
-        const o=document.getElementById('lg-ok'); o.hidden=false;
-        o.textContent='Đã gửi email xác nhận tới '+email+'. Bấm link trong email (mở ở đâu cũng được), rồi quay lại đây đăng nhập.';
+        if(data.session){ toast(name?'Chào '+name+'! Tài khoản đã sẵn sàng':'Tài khoản đã sẵn sàng',3000); await done(data.user); return; }
+        showLogin('', 'in', {email, ok:'Đã gửi email xác nhận tới '+email+'. Bấm link trong email rồi quay lại đây đăng nhập.'});
         return;
       }
       const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:appUrl()});
       if(error) throw error;
-      ok('Đã gửi link tới '+email+'. Mở link trên máy này để đặt mật khẩu mới.');
-    }catch(e){ err(authMsg(e.message||String(e))); }
-    go.disabled=false;
+      ok('Đã gửi link tới '+email+'. Mở link trên máy này để đặt mật khẩu mới. Không thấy thì xem thư mục Spam.');
+    }catch(e){
+      const m=e.message||String(e);
+      if(tab==='up' && /already registered|already exists|user_already_exists/i.test(m)){ showLogin('Email này đã có tài khoản. Nhập mật khẩu để đăng nhập.','in',{email}); return; }
+      err(authMsg(m));
+    }
+    go.disabled=false; go.textContent=T[tab];
   };
-  go.onclick=submit;
-  gate.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } }));
-  document.getElementById('lg-cfg').onclick=()=>{ store.set(LS.cfg,{off:true}); location.hash='#cai-dat'; location.reload(); };
+}
+function startGuest(){
+  store.set('hct_guest',true); mode='local'; user=null;
+  gate.hidden=true; gate.innerHTML='';
+  if(!S.tx.length && !store.get(LS.owner,null)) sampleData();
+  runRecurring(); location.hash='#tong-quan'; render();
 }
 function showNewPassword(){
   gate.hidden=false;
@@ -2024,7 +2079,7 @@ async function onLogin(u, fresh){
   else if(!owner){ // lần đầu nối cloud: đưa dữ liệu thật đang có trên máy lên
     clearSample();
     for(const k of Object.keys(TABLE)) S[k].forEach(r=>enqueue({k,op:'up',id:r.id}));
-    if(S.tx.length||S.settings.cats.length) enqueue({k:'settings',op:'up',id:'settings'});
+    // cài đặt: không đẩy đè lên tài khoản đã có; pull() tự tải lên nếu cloud chưa có
   }
   store.set(LS.owner,u.id);
   render();
@@ -2042,6 +2097,7 @@ async function logout(keepCfg){
 document.addEventListener('click',async e=>{
   const t=e.target, A=t.closest('[data-act]'), act=A&&A.dataset.act;
   if(t.closest('[data-open-add]')){ openAdd(); return; }
+  const eye=t.closest('[data-eye]'); if(eye){ const i=document.getElementById(eye.dataset.eye); if(i){ const sh=i.type==='password'; i.type=sh?'text':'password'; eye.textContent=sh?'Ẩn':'Hiện'; i.focus(); } return; }
   if(t.closest('[data-close]')){ closeSheet(); return; }
   const h=t.closest('[data-hint]'); if(h){ const s=document.getElementById('say'); s.value=h.dataset.hint; updateDraft(s.value); s.focus(); return; }
   const c=t.closest('[data-cat]'); if(c){ manualCat=c.dataset.cat; draft.cat=manualCat; paintDraft(); return; }
@@ -2109,6 +2165,16 @@ document.addEventListener('click',async e=>{
   }
   switch(act){
     case 'clear-sample': clearSample(); render(); toast('Đã xoá dữ liệu mẫu'); break;
+    case 'go-signup': showLogin('','up'); break;
+    case 'go-login': showLogin('','in'); break;
+    case 'onb-close': store.set('hct_onb',true); render(); break;
+    case 'acc-save': { const name=val('acc-name').trim().slice(0,40), pw=val('acc-pw'), upd={};
+      if(name!==userName()) upd.data={name};
+      if(pw){ if(pw.length<6){ toast('Mật khẩu cần ít nhất 6 ký tự'); break; } upd.password=pw; }
+      if(!Object.keys(upd).length){ toast('Chưa có gì thay đổi'); break; }
+      A.disabled=true; const {data,error}=await sb.auth.updateUser(upd); A.disabled=false;
+      if(error){ toast(authMsg(error.message),3500); break; }
+      user=data.user; render(); toast(upd.password?'Đã lưu, lần sau đăng nhập bằng mật khẩu mới':'Đã lưu tên'); break; }
     case 'budget': openBudget(); break;
     case 'rec-new': openRec(null); break;
     case 'jar-new': openJar(null); break;
@@ -2129,7 +2195,7 @@ document.addEventListener('click',async e=>{
     case 'ppl-save': S.settings.people=readPeople(); saveSettings(); toast('Đã lưu'); render(); break;
     case 'refresh': hardRefresh(); break;
     case 'upd-later': document.getElementById('upd').hidden=true; break;
-    case 'hen-new': if(mode!=='cloud'){ toast('Cần đăng nhập để tạo link hẹn'); break; } openHenNew(); break;
+    case 'hen-new': if(mode!=='cloud'){ if(isGuest()) showLogin('','up',{ok:'Tạo tài khoản miễn phí để tạo link hẹn ăn nhóm.'}); else toast('Cần đăng nhập để tạo link hẹn'); break; } openHenNew(); break;
     case 'hen-create': henCreate(A); break;
     case 'hen-refood': henDraft.salt=(henDraft.salt||0)+1; henDraft.foods=henFoodSuggest(4,henDraft.salt); henDraft.paint(); break;
     case 'hen-addfood': { const v=val('hfa').trim(); if(v && henDraft.foods.length<10){ henDraft.foods.push({ten:v,emoji:itemEmoji({note:v,cat:'an'})}); document.getElementById('hfa').value=''; henDraft.paint(); } break; }
@@ -2200,8 +2266,10 @@ async function boot(){
   if(!session && authErr){ showLogin('Link không dùng được: '+decodeURIComponent(authErr[1].replace(/\+/g,' '))+'. Thử lại.'); return; }
   if(!session){
     if(!navigator.onLine && store.get(LS.owner,null)){ syncErr='Ngoại tuyến'; runRecurring(); render(); showLock(); return; }
+    if(store.get('hct_guest',false) && !store.get(LS.owner,null)){ mode='local'; runRecurring(); render(); showLock(); if(location.hash==='#nhap' && !locked) openAdd(); return; }
     showLogin(); return;
   }
+  store.del('hct_guest');
   showLock();
   checkAI();
   await onLogin(session.user,false);

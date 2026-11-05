@@ -142,6 +142,17 @@ function shape(out, places) {
   return { items, tip: clip(out.loi_khuyen, 160) };
 }
 
+// Giới hạn lượt/ngày qua hàm hct_ai_take (supabase/ai-limit.sql). Chưa chạy SQL hoặc lỗi mạng → không chặn.
+async function takeQuota(env, sbUrl, sbKey, auth) {
+  const limit = Math.max(1, Math.min(500, parseInt(env.AI_DAILY_LIMIT, 10) || 20));
+  try {
+    const r = await fetch(sbUrl + '/rest/v1/rpc/hct_ai_take', { method: 'POST', headers: { authorization: auth, apikey: sbKey, 'content-type': 'application/json' }, body: JSON.stringify({ p_limit: limit }), signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d && typeof d.ok === 'boolean' ? { ok: d.ok, used: +d.used || 0, limit: +d.limit || limit, left: Math.max(0, (+d.limit || limit) - (+d.used || 0)) } : null;
+  } catch { return null; }
+}
+
 export async function onRequestGet({ env }) {
   return json({ ai: providers(env).length > 0, providers: providers(env) });
 }
@@ -174,19 +185,23 @@ export async function onRequestPost({ request, env }) {
     geo: (() => { const lat = Number(body.lat), lng = Number(body.lng);
       return isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng) ? { lat: Math.round(lat * 1000) / 1000, lng: Math.round(lng * 1000) / 1000 } : null; })(),
   };
+  const quota = await takeQuota(env, sbUrl, sbKey, auth);
+  if (quota && !quota.ok) return json({ error: `Hôm nay bạn đã dùng hết ${quota.limit} lượt gợi ý AI. Mai quay lại nhé, giờ mình gợi ý từ lịch sử ăn của bạn.`, code: 'quota', quota }, 429);
+  const json0 = json;
+  const out = (o, st) => json0(quota ? { ...o, quota } : o, st);
   const errs = [];
   for (const p of order) {
     try {
       if (p === 'gemini') {
         if (q.geo) {
-          try { const g = await callGemini(env, buildPrompt(q), q.geo); return json({ ...shape(extractJson(g.text), g.places), provider: 'gemini', maps: true }); }
+          try { const g = await callGemini(env, buildPrompt(q), q.geo); return out({ ...shape(extractJson(g.text), g.places), provider: 'gemini', maps: true }); }
           catch (e) { errs.push('gemini+maps: ' + (e && e.message || e)); }
         }
         const g = await callGemini(env, buildPrompt({ ...q, geo: null }), null);
-        return json({ ...shape(extractJson(g.text), g.places), provider: 'gemini' });
+        return out({ ...shape(extractJson(g.text), g.places), provider: 'gemini' });
       }
       const text = await callGroq(env, buildPrompt({ ...q, geo: null }));
-      return json({ ...shape(extractJson(text)), provider: p });
+      return out({ ...shape(extractJson(text)), provider: p });
     } catch (e) { errs.push(p + ': ' + (e && e.message || e)); }
   }
   return json({ error: 'AI đang bận hoặc hết hạn mức, thử lại sau ít phút.', detail: errs.join(' | ').slice(0, 400) }, 502);

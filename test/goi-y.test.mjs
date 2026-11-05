@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { onRequestGet, onRequestPost } from '../functions/api/goi-y.js';
 
 const calls = [];
-let geminiPlan = [];   // danh sách phản hồi giả cho mỗi lần gọi Gemini
+let geminiPlan = [];
+let quotaPlan = null;   // null = chưa chạy ai-limit.sql   // danh sách phản hồi giả cho mỗi lần gọi Gemini
 const AI_OK = { goi_y: [
   { ten: 'Bún bò Huế', emoji: '🍜', gia: 45000, cach: 'quán', quoc_gia: 'Việt', quan: 'Bà Năm', ly_do: 'Đổi vị sau hai hôm ăn cơm' },
   { ten: 'Cơm gà xối mỡ', emoji: '🍗', gia: 40000, cach: 'giao hàng', ly_do: 'Rẻ hơn ngân sách' },
@@ -12,6 +13,7 @@ const AI_OK = { goi_y: [
 const res = (status, body) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
 globalThis.fetch = async (url, init = {}) => {
   url = String(url); calls.push(url);
+  if (url.includes('/rpc/hct_ai_take')) return quotaPlan ? res(200, quotaPlan) : res(404, { message: 'function not found' });
   if (url.includes('/auth/v1/user')) return init.headers.authorization === 'Bearer good' ? res(200, { id: 'u1' }) : res(401, {});
   if (url.includes('generativelanguage')) {
     const next = geminiPlan.shift() || [200, { candidates: [{ content: { parts: [{ text: JSON.stringify(AI_OK) }] } }] }];
@@ -100,4 +102,18 @@ globalThis.fetch = async (url, init) => {
 r = await onRequestPost({ request: req('Bearer good', { ...B, lat: 10.7, lng: 106.7 }), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
 d = await r.json(); assert.equal(r.status, 200); assert.equal(d.maps, undefined); assert.equal(n2, 2); ok('Maps lỗi → gợi ý thường');
 globalThis.fetch = f0;
+
+// Giới hạn lượt AI mỗi ngày
+globalThis.fetch = f0;
+geminiPlan = []; quotaPlan = { ok: true, used: 3, limit: 20 };
+r = await onRequestPost({ request: req('Bearer good', B), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
+d = await r.json(); if (r.status !== 200) console.log(d); assert.equal(r.status, 200); assert.equal(d.quota.left, 17); ok('Còn lượt → trả kèm số lượt còn lại');
+quotaPlan = { ok: false, used: 20, limit: 20 };
+const before = calls.filter(u => u.includes('generativelanguage')).length;
+r = await onRequestPost({ request: req('Bearer good', B), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
+assert.equal(r.status, 429); assert.equal((await r.json()).code, 'quota');
+assert.equal(calls.filter(u => u.includes('generativelanguage')).length, before); ok('Hết lượt → 429, không gọi AI');
+quotaPlan = null;
+r = await onRequestPost({ request: req('Bearer good', B), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
+assert.equal(r.status, 200); assert.equal((await r.json()).quota, undefined); ok('Chưa chạy SQL → không chặn');
 console.log('Tất cả', n, 'test đạt');

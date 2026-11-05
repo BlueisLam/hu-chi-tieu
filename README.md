@@ -28,8 +28,9 @@ App dùng chung project **luna-cosmetics**, mọi bảng đều có tiền tố 
 
 Muốn dựng lại trên project khác: chạy `supabase/schema.sql` trong SQL Editor, rồi đổi `CONFIG`.
 
-**Tạo tài khoản đăng nhập:** project đang tắt đăng ký công khai (để bảo vệ shop), nên tạo tài khoản trong dashboard:
-Authentication → Users → **Add user → Create new user** → nhập email và mật khẩu → tick **Auto Confirm User** → Create.
+**Đăng ký / đăng nhập:** ai cũng tự tạo tài khoản ngay trong app (tên, email, mật khẩu). Cần bật trong Supabase → Authentication → Sign In / Providers: **Allow new users to sign up** = bật, **Confirm email** = tắt. An toàn cho shop luna-cosmetics vì mọi quyền ghi của shop đều kiểm `is_admin()` (bảng `admins`), user mới không có quyền gì ngoài dữ liệu `hct_` của chính họ.
+Nút **Dùng thử, không cần tài khoản** mở app với dữ liệu mẫu, lưu trên máy. Khi bấm Tạo tài khoản, các khoản đã ghi (trừ mẫu) được đưa lên cloud.
+Đăng nhập trên máy mới không ghi đè cài đặt đã có trên cloud.
 
 ### 2. Cloudflare Pages (tự deploy mỗi lần push)
 
@@ -79,6 +80,8 @@ Sau khi thêm biến: Deployments → bản mới nhất → **Retry deployment*
 **Ẩm thực:** Tự chọn (app tự đổi vị khi dạo này ăn lệch một kiểu) · Việt đồ nước · Việt cơm/khô · Hàn · Nhật · Thái · Trung · Âu Mỹ. Thẻ hiện thống kê 7 ngày, Báo cáo có thẻ "Ăn theo ẩm thực".
 
 **Chấm điểm quán:** gõ `bún bò 50k @Bà Năm` để ghi tên quán. Ăn xong, Tổng quan hỏi "ngon không?", hoặc bấm vào khoản chi → Chấm điểm quán (1–10, ẩm thực, nhận xét). Báo cáo có "Sổ tay quán ăn". AI dùng quán ≥ 8 điểm để gợi ý quay lại và tránh quán ≤ 5 điểm. Điểm lưu trong `hct_settings.data.reviews` nên không cần thêm cột Supabase.
+
+**Giới hạn lượt:** mỗi tài khoản 20 lượt Hỏi AI/ngày (giờ Việt Nam). Chạy `supabase/ai-limit.sql` một lần để bật; đổi số bằng biến `AI_DAILY_LIMIT` trên Cloudflare. Chưa chạy SQL thì không giới hạn.
 
 Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.mjs`
 
