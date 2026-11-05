@@ -208,6 +208,20 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 .eat-acts{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
 .eat-acts .acts{display:flex;gap:8px}
 .btn-s:disabled{opacity:.5;cursor:default}
+/* ẩm thực + chấm điểm */
+.stepper{display:inline-flex;align-items:center;gap:8px;background:var(--sunk);border-radius:14px;padding:3px}
+.stepper button{width:30px;height:30px;border-radius:10px;background:var(--surface);font-weight:700}
+.stepper button:disabled{opacity:.4;cursor:default}
+.stepper b{font-weight:600;font-size:13.5px;min-width:58px;text-align:center}
+.cui-bar{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;align-items:center}
+.cui-bar b{font-weight:600}
+.eat-q{display:block;color:var(--accent);font-size:12.5px;font-weight:600}
+.score{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.score button{padding:12px 0;border-radius:14px;background:var(--surface);border:2px solid transparent;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.score button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.star{display:inline-block;vertical-align:2px;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;margin-left:6px;background:var(--butter);color:var(--ink)}
+.score-dot{font-weight:700;font-size:14px;background:var(--sunk)}
+.score-dot.good{background:var(--mint)} .score-dot.bad{background:var(--bad-soft)}
 /* chi cho ai */
 .whob{display:inline-block;vertical-align:2px;font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px;color:var(--ink)}
 .whos{display:flex;gap:8px;flex-wrap:wrap}
@@ -535,6 +549,8 @@ function takeAmount(s){
 }
 const parseAmount = str => takeAmount(' '+norm(str)+' ').amount;
 function parse(raw){
+  let place=''; const pm=String(raw||'').match(/@\s*([^@]*)$/);
+  if(pm){ place=pm[1].trim().slice(0,60); raw=raw.slice(0,pm.index); }
   let s=' '+norm(raw)+' ';
   const out={amount:0,guessed:false,date:todayKey(),wallet:'cash',cat:'khac',note:''};
   const a=takeAmount(s); out.amount=a.amount; out.guessed=a.guessed; s=a.s;
@@ -551,11 +567,16 @@ function parse(raw){
   out.who='me';
   for(const pp of people()){ const n=norm(pp.name); if(!n) continue;
     const re=new RegExp('\\s(?:cho\\s+)?(?:em\\s+|be\\s+|thang\\s+|con\\s+)?'+reEsc(n)+'(?=\\s)');
-    if(re.test(s)){ out.who=pp.id; s=s.replace(re,' '); break; } }
+    const mm=s.match(re); if(!mm) continue;
+    const hasPrefix=/^\s(cho|em|be|thang|con)\s/.test(mm[0]);
+    const prev=s.slice(0,mm.index).trim().split(' ').pop();
+    if(!hasPrefix && ['lau','do','mon','kieu','vi','sup','goi','xoi','tra','pad','com chien'].includes(prev)) continue;   // "lẩu thái" là món, không phải em Thái
+    out.who=pp.id; s=s.replace(re,' '); break; }
   const chungRe=/\s(?:cho\s+(?=ca nha|ca hai|hai anh em|2 anh em|nha minh))?(chung|ca nha|ca hai|hai anh em|2 anh em|nha minh)(?=\s)/;
   if(out.who==='me' && chungRe.test(s)){ out.who='chung'; s=s.replace(chungRe,' '); }
   const note=s.replace(/\s+/g,' ').trim();
   out.note=noteFromOriginal(raw.trim(),note);
+  out.place=place;
   const L=S.settings.learned||{}, first=note.split(' ').slice(0,2).join(' ');
   const valid = id => id && cats().some(c=>c.id===id);
   if(note && valid(L[note])) out.cat=L[note];
@@ -625,9 +646,10 @@ function txRow(x){
   const c=catById(x.cat);
   return `<button class="tx${x.draft?' draft':''}" data-edit="${x.id}">
     <span class="dot" style="background:${catBg(c)}">${c.icon}</span>
-    <span class="t"><b>${esc(x.note||c.name)}${whoBadge(x)}</b><small>${esc(c.name)} · ${walletLabel(x.wallet)}${x.draft?'<span class="pend">Chờ xác nhận</span>':''}</small></span>
+    <span class="t"><b>${esc(x.note||c.name)}${whoBadge(x)}${rateBadge(x)}</b><small>${(S.settings.reviews||{})[x.id]&&S.settings.reviews[x.id].place?'📍 '+esc(S.settings.reviews[x.id].place)+' · ':''}${esc(c.name)} · ${walletLabel(x.wallet)}${x.draft?'<span class="pend">Chờ xác nhận</span>':''}</small></span>
     <span class="amt num">−${fmt(x.amount)}đ</span></button>`;
 }
+function rateBadge(x){ const r=(S.settings.reviews||{})[x.id]; return r&&r.score?`<span class="star num">★${r.score}</span>`:''; }
 function whoBadge(x){ const w=whoById(whoOf(x)); return w.id==='me'?'':`<span class="whob" style="background:var(--${w.color})">${esc(w.id==='chung'?'Chung':w.name)}</span>`; }
 function byWho(list){ const m={}; list.forEach(x=>{ const w=whoOf(x); m[w]=(m[w]||0)+(+x.amount||0); }); return m; }
 function whoSplit(list,total,title){
@@ -663,27 +685,78 @@ function potWhoSeg(list){
 }
 /* ============ hôm nay ăn gì ============ */
 // [tên, emoji, giá/người, bữa phù hợp, nhãn]
+// [tên, emoji, giá/người, bữa phù hợp, nhãn, ẩm thực]
 const DISHES = [
-  ['Phở bò','🍜',55000,'sang trua toi','nuoc'],['Bún bò Huế','🍜',50000,'sang trua toi','nuoc cay'],['Hủ tiếu Nam Vang','🍜',50000,'sang trua toi','nuoc'],
-  ['Bánh canh cua','🦀',55000,'sang trua','nuoc hai san'],['Bún riêu','🍜',40000,'sang trua','nuoc'],['Bún mắm','🍲',55000,'trua toi','nuoc hai san'],
-  ['Mì Quảng','🍜',45000,'sang trua','nuoc'],['Cháo lòng','🥣',35000,'sang toi','nuoc nhe'],['Cháo gà','🥣',35000,'sang toi','nuoc nhe'],
-  ['Bò kho bánh mì','🥘',45000,'sang','nuoc'],['Bánh mì thịt','🥖',25000,'sang vat','kho re'],['Xôi mặn','🍙',25000,'sang','kho re'],
-  ['Bánh cuốn','🥟',35000,'sang','nhe'],['Bánh bao','🥟',20000,'sang vat','re'],['Cơm tấm sườn','🍚',45000,'sang trua toi','com'],
-  ['Cơm gà xối mỡ','🍗',45000,'trua toi','com chien'],['Cơm văn phòng','🍱',40000,'trua','com re'],['Cơm chay','🥦',35000,'trua toi','com chay nhe re'],
-  ['Cơm rang dưa bò','🍳',45000,'trua toi','com chien'],['Bún thịt nướng','🥗',40000,'trua toi','kho'],['Bún đậu mắm tôm','🍢',55000,'trua toi','kho'],
-  ['Bánh xèo','🥞',50000,'toi','chien'],['Gỏi cuốn','🌯',30000,'trua vat','nhe re'],['Lẩu','🍲',150000,'toi','nuoc nhieu'],
-  ['Ốc','🐚',90000,'toi','hai san'],['Gà rán','🍗',70000,'trua toi','chien'],['Pizza','🍕',90000,'toi','chien'],['Sushi','🍣',120000,'toi','nhat'],
-  ['Cơm trộn Hàn Quốc','🍲',75000,'trua toi','han'],['Tokbokki','🌶️',50000,'vat toi','han cay'],['Salad ức gà','🥗',55000,'trua toi','nhe healthy'],
-  ['Hamburger','🍔',60000,'trua toi','chien'],['Bánh tráng trộn','🌶️',20000,'vat','re cay'],['Bắp xào','🌽',20000,'vat','re'],
-  ['Chè','🍧',25000,'vat','ngot'],['Sữa chua trái cây','🍨',25000,'vat','ngot nhe'],['Trà sữa','🧋',35000,'vat','uong ngot'],
-  ['Cà phê sữa đá','☕',25000,'sang vat','uong'],['Nước ép','🥤',35000,'vat','uong healthy'],
-  ['Tự nấu canh và trứng chiên','🍳',30000,'trua toi','tu-nau re'],['Tự nấu mì xào rau','🥬',25000,'toi','tu-nau re'],['Tự nấu cơm thịt kho','🍲',35000,'toi','tu-nau']
+  // Việt – đồ nước
+  ['Phở bò','🍜',55000,'sang trua toi','nuoc','vn'],['Bún bò Huế','🍜',50000,'sang trua toi','nuoc cay','vn'],['Hủ tiếu Nam Vang','🍜',50000,'sang trua toi','nuoc','vn'],
+  ['Bánh canh cua','🦀',55000,'sang trua','nuoc hai san','vn'],['Bún riêu','🍜',40000,'sang trua','nuoc','vn'],['Bún mắm','🍲',55000,'trua toi','nuoc hai san','vn'],
+  ['Mì Quảng','🍜',45000,'sang trua','nuoc','vn'],['Cháo lòng','🥣',35000,'sang toi','nuoc nhe','vn'],['Cháo gà','🥣',35000,'sang toi','nuoc nhe','vn'],
+  ['Bò kho bánh mì','🥘',45000,'sang','nuoc','vn'],['Bún cá','🐟',40000,'sang trua','nuoc','vn'],['Miến gà','🍜',40000,'sang toi','nuoc nhe','vn'],
+  ['Lẩu','🍲',150000,'toi','nuoc nhieu','vn'],
+  // Việt – cơm, đồ khô
+  ['Bánh mì thịt','🥖',25000,'sang vat','kho re','vn'],['Xôi mặn','🍙',25000,'sang','kho re','vn'],['Bánh cuốn','🥟',35000,'sang','kho nhe','vn'],
+  ['Bánh bao','🥟',20000,'sang vat','kho re','vn'],['Cơm tấm sườn','🍚',45000,'sang trua toi','kho com','vn'],['Cơm gà xối mỡ','🍗',45000,'trua toi','kho com chien','vn'],
+  ['Cơm văn phòng','🍱',40000,'trua','kho com re','vn'],['Cơm chay','🥦',35000,'trua toi','kho com chay nhe re','vn'],['Cơm rang dưa bò','🍳',45000,'trua toi','kho com chien','vn'],
+  ['Bún thịt nướng','🥗',40000,'trua toi','kho','vn'],['Bún đậu mắm tôm','🍢',55000,'trua toi','kho','vn'],['Bánh xèo','🥞',50000,'toi','kho chien','vn'],
+  ['Gỏi cuốn','🌯',30000,'trua vat','kho nhe re','vn'],['Ốc','🐚',90000,'toi','kho hai san','vn'],['Bánh tráng trộn','🌶️',20000,'vat','kho re cay','vn'],
+  ['Bắp xào','🌽',20000,'vat','kho re','vn'],['Chè','🍧',25000,'vat','ngot','vn'],
+  ['Tự nấu canh và trứng chiên','🍳',30000,'trua toi','nuoc tu-nau re','vn'],['Tự nấu mì xào rau','🥬',25000,'toi','kho tu-nau re','vn'],['Tự nấu cơm thịt kho','🍲',35000,'toi','kho tu-nau','vn'],
+  // Hàn
+  ['Tokbokki','🌶️',50000,'vat toi','cay','han'],['Kimbap','🍙',40000,'sang trua vat','nhe','han'],['Cơm trộn Hàn Quốc','🍲',75000,'trua toi','com','han'],
+  ['Mì cay Hàn Quốc','🍜',55000,'trua toi','nuoc cay','han'],['Gà rán Hàn Quốc','🍗',120000,'toi','chien nhieu','han'],['Mì tương đen','🍝',60000,'trua toi','','han'],
+  ['Canh kimchi','🥘',70000,'trua toi','nuoc cay','han'],
+  // Nhật
+  ['Sushi','🍣',120000,'trua toi','','nhat'],['Ramen','🍜',90000,'trua toi','nuoc','nhat'],['Udon','🍜',70000,'trua toi','nuoc','nhat'],
+  ['Cơm cà ri Nhật','🍛',70000,'trua toi','com','nhat'],['Cơm katsu','🍱',75000,'trua toi','com chien','nhat'],['Onigiri','🍙',25000,'sang vat','re nhe','nhat'],
+  ['Takoyaki','🐙',35000,'vat','chien','nhat'],
+  // Thái
+  ['Lẩu Thái','🍲',150000,'toi','nuoc cay nhieu','thai'],['Pad Thai','🍝',65000,'trua toi','','thai'],['Cơm chiên dứa Thái','🍍',60000,'trua toi','com','thai'],
+  ['Xôi xoài','🥭',40000,'vat','ngot','thai'],['Gỏi đu đủ Thái','🥗',45000,'trua vat','cay nhe','thai'],['Súp Tom Yum','🍲',70000,'toi','nuoc cay','thai'],
+  // Trung
+  ['Dimsum','🥟',90000,'sang trua','','trung'],['Mì vịt tiềm','🍜',60000,'trua toi','nuoc','trung'],['Hoành thánh','🥟',45000,'sang toi','nuoc','trung'],
+  ['Há cảo','🥟',45000,'sang vat','','trung'],['Lẩu mala xiên que','🍢',100000,'toi','cay nhieu','trung'],['Cơm vịt quay','🦆',55000,'trua toi','com','trung'],
+  // Âu Mỹ
+  ['Pizza','🍕',90000,'trua toi','chien','au'],['Hamburger','🍔',60000,'trua toi','chien','au'],['Mì Ý sốt bò bằm','🍝',75000,'trua toi','','au'],
+  ['Bít tết','🥩',120000,'toi','','au'],['Salad ức gà','🥗',55000,'trua toi','nhe healthy','au'],['Sandwich','🥪',40000,'sang trua','nhe','au'],
+  ['Gà rán','🍗',70000,'trua toi','chien','au'],
+  // Đồ uống
+  ['Trà sữa','🧋',35000,'vat','uong ngot','uong'],['Cà phê sữa đá','☕',25000,'sang vat','uong','uong'],['Nước ép','🥤',35000,'vat','uong healthy','uong'],
+  ['Sữa chua trái cây','🍨',25000,'vat','ngot nhe','uong']
 ];
+const CUISINES = {vn:{n:'Việt',f:'🇻🇳'},han:{n:'Hàn',f:'🇰🇷'},nhat:{n:'Nhật',f:'🇯🇵'},thai:{n:'Thái',f:'🇹🇭'},trung:{n:'Trung',f:'🇨🇳'},au:{n:'Âu Mỹ',f:'🍔'},khac:{n:'Khác',f:'🌏'}};
+const EAT_CUI = [['auto','✨ Tự chọn'],['vn-nuoc','🇻🇳 Việt · đồ nước'],['vn-kho','🇻🇳 Việt · cơm, khô'],['han','🇰🇷 Hàn'],['nhat','🇯🇵 Nhật'],['thai','🇹🇭 Thái'],['trung','🇨🇳 Trung'],['au','🍔 Âu Mỹ']];
+const CUI_KW = [
+  ['uong','tra sua|cafe|ca phe|cf|nuoc ep|sinh to|tra dao|tra chanh|tra|bia|coca|pepsi|nuoc ngot|sua chua|che|kem|matcha latte|smoothie'],
+  ['han','han quoc|tokbokki|tteokbokki|kimbap|gimbap|bibimbap|kimchi|bulgogi|samgyeopsal|jjajang|mi cay|mi tuong den|lau han|ga ran han|com tron|soju|ramyeon|korean|thit nuong han'],
+  ['nhat','nhat|sushi|sashimi|ramen|udon|soba|katsu|tonkatsu|takoyaki|tempura|onigiri|bento|donburi|ca ri nhat|cari nhat'],
+  ['thai','lau thai|tom yum|tomyum|pad thai|xoi xoai|com chien thai|com chien dua|goi du du|do thai|mon thai'],
+  ['trung','trung hoa|dimsum|dim sum|ha cao|xiu mai|vit quay|mi vit tiem|lau tu xuyen|hoanh thanh|sui cao|ma la|mala|mi keo|dai loan|ta pi a'],
+  ['au','pizza|burger|hamburger|mi y|spaghetti|pasta|steak|bit tet|beefsteak|salad|sandwich|kfc|lotteria|mcdonald|jollibee|ga ran|khoai tay chien|hotdog|taco|banh mi que pate']
+].map(([c,k])=>[c,new RegExp('(^|\\s)('+k+')(\\s|$)')]);
+const VN_NUOC = /(^|\s)(pho|bun bo|bun rieu|bun mam|bun ca|bun moc|bun thang|hu tieu|mi quang|banh canh|chao|lau|mien|sup|canh|bo kho|mi|bun nuoc)(\s|$)/;
+function cuisineOf(note){
+  const n=' '+norm(note)+' ';
+  for(const [c,re] of CUI_KW) if(re.test(n)) return c==='uong'?{c:'uong',sub:'uong'}:{c,sub:VN_NUOC.test(n)?'nuoc':''};
+  return {c:'vn',sub:VN_NUOC.test(n)?'nuoc':'kho'};
+}
+const cuiOfTx = x => { const r=(S.settings.reviews||{})[x.id]; const g=cuisineOf(x.note); return r&&r.cuisine?{c:r.cuisine,sub:g.sub}:g; };
+function cuisineStats(days){
+  const items=recentFood(days).map(cuiOfTx).filter(g=>g.c!=='uong'), cnt={}; let nuoc=0;
+  items.forEach(g=>{ cnt[g.c]=(cnt[g.c]||0)+1; if(g.c==='vn'&&g.sub==='nuoc') nuoc++; });
+  return {total:items.length,cnt,nuoc};
+}
+function statsText(st){
+  return Object.entries(st.cnt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${CUISINES[c].n} ${n}${c==='vn'&&st.nuoc?` (đồ nước ${st.nuoc})`:''}`).join(', ');
+}
+const reviews = () => S.settings.reviews||(S.settings.reviews={});
+const reviewList = () => Object.entries(S.settings.reviews||{}).map(([id,r])=>({id,...r})).filter(r=>r.score);
+const reviewLine = r => `${r.dish}${r.place?' – '+r.place:''} (${(CUISINES[r.cuisine]||CUISINES.khac).n}) ${r.score}/10${r.review?': '+r.review:''}`;
 const MEAL_NAME = {sang:'Sáng',trua:'Trưa',vat:'Chiều',toi:'Tối'};
 const mealNow = () => { const h=new Date().getHours(); return h<10?'sang':h<14?'trua':h<17?'vat':'toi'; };
-let eat = {meal:mealNow(), people:1, reroll:0, loading:false};
+let eat = {meal:mealNow(), people:1, group:'mot', reroll:0, loading:false, cui:'auto'};
+const NHOM = /(^|\s)(lau|oc|bbq|do nuong|thit nuong han|ga ran|pizza|dimsum|banh xeo|bun dau|sushi|mala|xien que)(\s|$)/;
 let aiAvail = null;
-const eatKey = () => 'hct_eat_'+todayKey()+'_'+eat.meal+'_'+eat.people;
+const eatKey = () => 'hct_eat_'+todayKey()+'_'+eat.meal+'_'+eat.group+eat.people+'_'+eat.cui;
 eat.reroll=(store.get(eatKey(),null)||{}).reroll||0;
 function seeded(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; }
   return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return ((h^=h>>>16)>>>0)/4294967296; }; }
@@ -698,34 +771,57 @@ function mealBudget(){
   const b=S.settings.budgets.an;
   if(b){
     const left=Math.max(0,b-monthSpent('an')), perDay=left/daysLeft;
-    const per=Math.max(20000,Math.round(perDay*share/eat.people/5000)*5000);
+    const per=Math.max(20000,Math.round(perDay*share*(eat.group==='nhom'?1.3:1)/5000)*5000);
     return {per, note:left>0?`Ngân sách ăn uống còn ${fmtShort(left)} cho ${daysLeft} ngày, khoảng ${fmtShort(perDay)}/ngày`:'Đã hết ngân sách ăn uống tháng này, ưu tiên món rẻ'};
   }
   const xs=recentFood(30).filter(x=>whoOf(x)==='me').map(x=>+x.amount).sort((a,b)=>a-b);
   const med=xs.length?xs[Math.floor(xs.length/2)]:45000;
-  const per=Math.min(150000,Math.max(20000,Math.round(med*(eat.meal==='vat'?0.6:1)/5000)*5000));
+  const per=Math.min(200000,Math.max(20000,Math.round(med*(eat.meal==='vat'?0.6:1)*(eat.group==='nhom'?1.3:1)/5000)*5000));
   return {per, note:'Chưa đặt ngân sách Ăn uống nên dùng giá trung bình các bữa gần đây'};
 }
 function localSuggest(per){
   const T=S.settings.taste||{}, avoid=tasteWords(T.avoid), likes=tasteWords(T.likes);
   const recent=recentFood(4).map(x=>norm(x.note)), rnd=seeded(eatKey()+'#'+eat.reroll);
   const eatenRecently = n => recent.some(r=>r && (r.includes(n) || n.includes(r)));
-  const pool=DISHES.filter(d=>d[3].split(' ').includes(eat.meal)).map(([ten,emoji,gia,meals,tags])=>{
+  const want=eat.cui, st=cuisineStats(7);
+  const fitCui = (cui,tags) => want==='auto' ? cui!=='uong' || eat.meal==='vat'
+    : want==='vn-nuoc' ? cui==='vn' && /nuoc/.test(tags) : want==='vn-kho' ? cui==='vn' && !/nuoc/.test(tags) && !/uong/.test(tags) : cui===want;
+  let base=DISHES.filter(d=>fitCui(d[5],d[4]) && d[3].split(' ').includes(eat.meal));
+  if(base.length<4) base=DISHES.filter(d=>fitCui(d[5],d[4]));   // ít món hợp bữa thì nới điều kiện bữa
+  const pool=base.map(([ten,emoji,gia,meals,tags,cui])=>{
     const n=norm(ten), hay=n+' '+tags;
     if(avoid.some(a=>hay.includes(a))) return null;
     let score=rnd()*1.2, why=[];
+    const share=NHOM.test(' '+n+' ')||/nhieu/.test(tags);
+    if(eat.group==='nhom'){ if(share){ score+=2.4; why.push('Hợp ăn nhóm'); } else if(/tu-nau/.test(tags)) score-=3; else score-=0.6; }
+    else if(eat.group==='mot' && /nhieu/.test(tags)) score-=1.5;
+    if(want==='auto' && st.total>=3 && cui!=='uong'){ const share=(st.cnt[cui]||0)/st.total; score+=(0.5-share)*1.6; if(!st.cnt[cui] && cui!=='vn') why.push('Lâu rồi chưa ăn đồ '+CUISINES[cui].n); }
     if(eatenRecently(n)) score-=3; else if(recent.length) why.push('Mấy hôm nay chưa ăn');
-    const diff=(gia-per)/per; score-=Math.max(0,diff)*2.5+Math.max(0,-diff-0.5);
+    const diff=(gia-per)/per; score-=Math.max(0,diff)*(eat.group==='nhom'&&share?0.7:2.5)+Math.max(0,-diff-0.5);
     if(gia<=per) why.push(gia<=per*0.75?'Rẻ hơn ngân sách':'Vừa ngân sách');
     const lk=likes.find(l=>hay.includes(l)); if(lk){ score+=1.2; why.unshift('Hợp khẩu vị '+lk); }
-    return {ten,emoji,gia,cach:tags.includes('tu-nau')?'tự nấu':'quán',ly_do:why.slice(0,2).join(' · ')||'Đổi gió cho bữa '+MEAL_NAME[eat.meal].toLowerCase(),score,kind:tags.split(' ')[0]};
-  }).filter(Boolean).sort((a,b)=>b.score-a.score);
+    return {ten,emoji,gia,cach:tags.includes('tu-nau')?'tự nấu':'quán',cui,ly_do:why.slice(0,2).join(' · ')||'Đổi gió cho bữa '+MEAL_NAME[eat.meal].toLowerCase(),score,kind:want==='auto'?cui:cui+(tags.split(' ')[0]||'')};
+  }).filter(Boolean);
+  // quán đã chấm điểm cao: gợi ý quay lại
+  const seenPlace=new Set();
+  reviewList().filter(r=>r.score>=8 && fitCui(r.cuisine||'vn', VN_NUOC.test(' '+norm(r.dish)+' ')?'nuoc':'kho')).sort((a,b)=>b.score-a.score||String(b.date).localeCompare(String(a.date))).forEach(r=>{
+    const k=norm(r.place||r.dish); if(seenPlace.has(k)) return; seenPlace.add(k);
+    const n=norm(r.dish); if(avoid.some(a=>n.includes(a))) return;
+    const gia=Math.round((r.amount||per)/((r.who==='chung')?2:1)/1000)*1000;
+    let score=rnd()*1.2+ (r.score-7)*0.6 - (eatenRecently(n)?3:0) - Math.max(0,(gia-per)/per)*2;
+    pool.push({ten:r.dish,emoji:itemEmoji({note:r.dish,cat:'an'}),gia,cach:'quán',cui:r.cuisine||'vn',quan:r.place||'',diem:r.score,
+      ly_do:`Bạn chấm ${r.score}/10`+(r.review?' · '+r.review:''),score,kind:'review'+k});
+  });
+  pool.sort((a,b)=>b.score-a.score);
   const out=[], kinds=new Set();
   for(const d of pool){ if(out.length>=3) break; if(kinds.has(d.kind) && pool.length>6) continue; kinds.add(d.kind); out.push(d); }
   for(const d of pool){ if(out.length>=3) break; if(!out.includes(d)) out.push(d); }
   return out;
 }
 function eatTip(){
+  const st=cuisineStats(7);
+  if(st.total>=5){ const vn=(st.cnt.vn||0)/st.total; if(vn>=0.85 && eat.cui==='auto') return `7 ngày qua gần như toàn đồ Việt (${st.cnt.vn}/${st.total} bữa), thử đổi sang Hàn, Nhật hay Thái xem.`;
+    if(st.nuoc>=5) return `Tuần này ăn đồ nước ${st.nuoc} bữa rồi, đổi qua cơm hoặc đồ khô cho đỡ ngán nhé.`; }
   const r=recentFood(7), cnt={}; r.forEach(x=>{ const k=norm(x.note); cnt[k]=(cnt[k]||0)+1; });
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
   if(top && top[1]>=3){ const x=r.find(y=>norm(y.note)===top[0]); return `7 ngày qua bạn ăn ${x.note.toLowerCase()} ${top[1]} lần rồi, thử đổi vị nhé.`; }
@@ -741,11 +837,15 @@ function eatCard(){
   return `<section class="card eat" aria-label="Hôm nay ăn gì">
     <div class="card-h"><h2>Hôm nay ăn gì?</h2>
       <div class="seg seg-s" role="group" aria-label="Bữa">${Object.entries(MEAL_NAME).map(([k,l])=>`<button data-eatmeal="${k}" aria-pressed="${eat.meal===k}">${l}</button>`).join('')}</div></div>
-    <div class="eat-ctl">${p0?`<div class="seg seg-s" role="group" aria-label="Ăn cho ai"><button data-eatppl="1" aria-pressed="${eat.people===1}">Mình</button><button data-eatppl="2" aria-pressed="${eat.people===2}">Mình + ${esc(p0.name)}</button></div>`:''}
+    <div class="eat-ctl"><div class="seg seg-s" role="group" aria-label="Ăn với ai"><button data-eatgrp="mot" aria-pressed="${eat.group==='mot'}">Một mình</button><button data-eatgrp="hai" aria-pressed="${eat.group==='hai'}">2 người</button><button data-eatgrp="nhom" aria-pressed="${eat.group==='nhom'}">Nhóm</button></div>
+      ${eat.group==='nhom'?`<div class="stepper" role="group" aria-label="Số người"><button data-eatn="-1" aria-label="Bớt một người" ${eat.people<=3?'disabled':''}>−</button><b class="num">${eat.people} người</b><button data-eatn="1" aria-label="Thêm một người" ${eat.people>=12?'disabled':''}>＋</button></div>`:''}
       <span class="lbl">Khoảng <b class="num">${fmtShort(B.per)}</b>/người · ${esc(B.note)}</span></div>
+    <div class="filters" role="group" aria-label="Ẩm thực">${EAT_CUI.map(([k,l])=>`<button class="pill" data-eatcui="${k}" aria-pressed="${eat.cui===k}">${l}</button>`).join('')}</div>
+    ${(()=>{ const st=cuisineStats(7); return st.total?`<div class="cui-bar" aria-label="7 ngày qua">${Object.entries(st.cnt).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span>${CUISINES[c].f} ${CUISINES[c].n} <b class="num">${n}</b>${c==='vn'&&st.nuoc?` <small>(nước ${st.nuoc})</small>`:''}</span>`).join('')}<small class="lbl">· 7 ngày qua</small></div>`:''; })()}
     <div class="eat-list">${eat.loading?[0,1,2].map(()=>'<div class="eat-i ghost"><span class="eat-e">🍽️</span><div><b>Đang nghĩ món…</b><small>&nbsp;</small></div></div>').join(''):
       items.map((d,i)=>`<div class="eat-i"><span class="eat-e">${esc(d.emoji)}</span><div class="eat-t"><b>${esc(d.ten)}</b>
-        <small class="num">${fmtShort(d.gia)}${eat.people>1?'/người':''} · ${esc(d.cach)}</small><p>${esc(d.ly_do||'')}</p></div>
+        <small class="num">${fmtShort(d.gia)}${eat.people>1?'/người':''}${eat.people>1?' · cả '+(eat.group==='nhom'?'nhóm':'2 người')+' ~'+fmtShort(d.gia*eat.people):''} · ${esc(d.cach)}${d.cui&&CUISINES[d.cui]?' · '+CUISINES[d.cui].f:''}</small>
+        ${d.quan?`<small class="eat-q">📍 ${esc(d.quan)}${d.diem?` · ★ ${d.diem}/10`:''}</small>`:''}<p>${esc(d.ly_do||'')}</p></div>
         <button class="btn-s" data-eatpick="${i}">Ăn món này</button></div>`).join('')}</div>
     ${tip&&!eat.loading?`<p class="eat-tip">💡 ${esc(tip)}</p>`:''}
     <div class="eat-acts">
@@ -766,8 +866,12 @@ async function askAI(){
     if(!session) throw new Error('Phiên đăng nhập đã hết, hãy đăng nhập lại.');
     const T=S.settings.taste||{}, B=mealBudget();
     const r=await fetch('/api/goi-y',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},
-      body:JSON.stringify({meal:eat.meal,people:eat.people,perMeal:B.per,today:['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][new Date().getDay()]+', '+fmtD(todayKey()),
-        recent:recentFood(10).map(x=>dayLabel(x.date)+': '+x.note+' '+fmtShort(x.amount)).slice(0,25),exclude,likes:T.likes||'',avoid:T.avoid||'',note:T.note||''})});
+      body:JSON.stringify({meal:eat.meal,people:eat.people,group:eat.group,perMeal:B.per,today:['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][new Date().getDay()]+', '+fmtD(todayKey()),
+        recent:recentFood(10).map(x=>dayLabel(x.date)+': '+x.note+' '+fmtShort(x.amount)).slice(0,25),exclude,likes:T.likes||'',avoid:T.avoid||'',
+        cuisine:eat.cui==='auto'?'':(EAT_CUI.find(c=>c[0]===eat.cui)||[,''])[1].replace(/^\S+\s/,''),
+        cuisineStats:statsText(cuisineStats(7)),
+        good:reviewList().filter(r=>r.score>=8).sort((a,b)=>b.score-a.score).slice(0,10).map(reviewLine),
+        bad:reviewList().filter(r=>r.score<=5).slice(0,8).map(reviewLine),note:T.note||''})});
     let d={}; try{ d=await r.json(); }catch(e){}
     if(!r.ok){ if(d.code==='no_key') aiAvail=false; throw new Error(d.error||('Lỗi '+r.status)); }
     eat.reroll++;
@@ -798,7 +902,11 @@ function viewHome(){
   const drafts=S.tx.filter(x=>x.draft).sort((a,b)=>a.date.localeCompare(b.date));
   const dueDebts=S.debts.filter(d=>!d.paid&&d.due&&dayDiff(t,d.due)<=3);
   const overB=Object.entries(S.settings.budgets).filter(([id,b])=>b&&cats().some(c=>c.id===id)&&budgetState(cm[id]||0,b)).map(([id,b])=>({id,b,s:cm[id]||0}));
+  const RV=S.settings.reviews||{};
+  const toRate=L.filter(x=>x.cat==='an' && !x.sample && x.date>=addDays(t,-1) && x.amount>=20000 && !(RV[x.id]&&(RV[x.id].score||RV[x.id].skip)) && cuisineOf(x.note).c!=='uong')
+    .sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,2);
   const attention=[
+    ...toRate.map(x=>`<div class="alert"><span class="dot" style="background:var(--peach)">${itemEmoji(x)}</span><div class="t"><b>${esc(x.note)} ngon không?</b><small>${RV[x.id]&&RV[x.id].place?'📍 '+esc(RV[x.id].place)+' · ':''}Chấm điểm để AI gợi ý chuẩn hơn</small></div><div class="acts"><button class="btn-s" data-rate="${x.id}">Chấm</button><button class="btn-s ghost" data-rateskip="${x.id}">Bỏ</button></div></div>`),
     ...drafts.map(x=>{const c=catById(x.cat);return `<div class="alert"><span class="dot" style="background:${catBg(c)}">${c.icon}</span><div class="t"><b>${esc(x.note)} · ${fmtShort(x.amount)}</b><small>Định kỳ · ngày ${fmtD(x.date)}</small></div><div class="acts"><button class="btn-s" data-confirm="${x.id}">Xác nhận</button><button class="btn-s ghost" data-skip="${x.id}">Bỏ</button></div></div>`;}),
     ...dueDebts.map(d=>{const di=dueInfo(d.due);return `<div class="alert"><span class="dot" style="background:var(--lilac)">${d.kind==='lend'?'🤝':'💸'}</span><div class="t"><b>${d.kind==='lend'?esc(d.person)+' nợ bạn':'Bạn nợ '+esc(d.person)} ${fmtShort(d.amount)}</b><small><span class="due ${di.cls}">${di.txt}</span></small></div><a class="btn-s ghost" href="#ke-hoach" style="text-decoration:none">Xem</a></div>`;}),
     ...overB.map(o=>{const c=catById(o.id),st=budgetState(o.s,o.b);return `<div class="alert"><span class="dot" style="background:${catBg(c)}">${c.icon}</span><div class="t"><b>${esc(c.name)}: ${fmtShort(o.s)} / ${fmtShort(o.b)}</b><small><span class="state ${st}">${st==='bad'?'Vượt ngân sách':'Đã dùng '+Math.round(o.s/o.b*100)+'%'}</span></small></div><a class="btn-s ghost" href="#ke-hoach" style="text-decoration:none">Xem</a></div>`;})
@@ -929,7 +1037,28 @@ function viewReport(){
       ${entries.length?catRows(entries,total,pm):'<div class="empty">Chưa có dữ liệu.</div>'}</section>
     <section class="card"><div class="card-h"><h2>Khoản lớn nhất</h2></div>
       ${top.length?top.map(txRow).join(''):'<div class="empty">Chưa có dữ liệu.</div>'}</section>
-  </div>`;
+  </div>
+  <div class="grid2">${cuisineCard(cur)}${placeBook()}</div>`;
+}
+function cuisineCard(cur){
+  const food=cur.filter(x=>x.cat==='an').map(x=>({x,g:cuiOfTx(x)})).filter(o=>o.g.c!=='uong');
+  if(!food.length) return `<section class="card"><div class="card-h"><h2>Ăn theo ẩm thực</h2></div><div class="empty">Kỳ này chưa ghi bữa ăn nào.</div></section>`;
+  const m={}; food.forEach(({x,g})=>{ const k=g.c==='vn'?(g.sub==='nuoc'?'vn-nuoc':'vn-kho'):g.c; (m[k]=m[k]||{n:0,v:0}); m[k].n++; m[k].v+=+x.amount; });
+  const lab={'vn-nuoc':'🇻🇳 Việt · đồ nước','vn-kho':'🇻🇳 Việt · cơm, khô'}; const max=Math.max(...Object.values(m).map(o=>o.n));
+  return `<section class="card"><div class="card-h"><h2>Ăn theo ẩm thực</h2><span class="lbl">${food.length} bữa</span></div>
+    ${Object.entries(m).sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<div class="cat-row" style="grid-template-columns:1fr auto"><div style="min-width:0"><div class="n">${lab[k]||CUISINES[k].f+' '+CUISINES[k].n}</div><div class="bar"><i style="width:${Math.max(4,o.n/max*100)}%;background:${BAR.peach}"></i></div></div><div class="v num">${o.n} bữa<small>${fmtShort(o.v)}</small></div></div>`).join('')}</section>`;
+}
+function placeBook(){
+  const by={}; reviewList().forEach(r=>{ const k=norm(r.place)||('~'+norm(r.dish)); const o=by[k]||(by[k]={place:r.place,dishes:{},sum:0,n:0,last:r,cui:r.cuisine});
+    o.sum+=r.score; o.n++; o.dishes[r.dish]=Math.max(o.dishes[r.dish]||0,r.score); if(String(r.date)>String(o.last.date)) o.last=r; });
+  const rows=Object.values(by).map(o=>({...o,avg:o.sum/o.n})).sort((a,b)=>b.avg-a.avg||b.n-a.n);
+  return `<section class="card"><div class="card-h"><h2>Sổ tay quán ăn</h2><span class="lbl">${rows.length} quán</span></div>
+    ${rows.length?rows.slice(0,12).map(o=>{ const best=Object.entries(o.dishes).sort((a,b)=>b[1]-a[1])[0];
+      const st=o.avg>=8?'good':o.avg<=5?'bad':'';
+      return `<button class="tx" data-rate="${o.last.id}"><span class="dot score-dot ${st}">${o.avg%1?o.avg.toFixed(1):o.avg}</span>
+        <span class="t"><b>${esc(o.place||o.last.dish)}</b><small>${(CUISINES[o.cui]||CUISINES.khac).f} ${esc(best[0])}${o.n>1?' · '+o.n+' lần':''}${o.last.review?' · '+esc(o.last.review):''}</small></span>
+        <span class="amt">${st==='bad'?'Tránh':st==='good'?'Quay lại':''}</span></button>`; }).join('')
+      :'<div class="empty">Ăn xong bấm vào khoản chi rồi chọn “Chấm điểm quán”. Quán điểm cao sẽ được gợi ý quay lại.</div>'}</section>`;
 }
 
 /* ============ màn Kế hoạch ============ */
@@ -1262,7 +1391,7 @@ let draft=null, manualCat=null, manualWho=null;
 function openAdd(prefill, cat){
   if(!document.getElementById('gate').hidden) return;
   manualCat=null; manualWho=null; draft=parse('');
-  const hints=['cafe 45k','grab 32k ck',`cơm 45k cho ${(people()[0]||{name:'Thái'}).name}`,'đi chợ 300k chung','tiền điện 412k ck'];
+  const hints=['bún bò 50k @Bà Năm','cafe 45k',`cơm 45k cho ${(people()[0]||{name:'Thái'}).name}`,'đi chợ 300k chung','tiền điện 412k ck'];
   openSheet(`${sheetHead('Ghi khoản chi')}
   <input class="say" id="say" autocomplete="off" enterkeyhint="done" placeholder="cafe 45k" aria-label="Gõ khoản chi">
   <div class="hints">${hints.map(h=>`<button data-hint="${h}">${h}</button>`).join('')}</div>
@@ -1293,7 +1422,7 @@ function paintDraft(){
   const c=catById(draft.cat);
   document.getElementById('pv').innerHTML=`<span class="dot" style="background:${catBg(c)}">${c.icon}</span>
     <div style="min-width:0"><div class="pa num">${fmt(draft.amount)}đ</div>
-    <div class="pm">${esc(draft.note||'Chưa có ghi chú')} · ${esc(c.name)}${draft.who!=='me'?' · '+esc(whoText(whoById(draft.who))):''} · ${dayLabel(draft.date)} · ${walletLabel(draft.wallet)}</div>
+    <div class="pm">${esc(draft.note||'Chưa có ghi chú')}${draft.place?' · 📍 '+esc(draft.place):''} · ${esc(c.name)}${draft.who!=='me'?' · '+esc(whoText(whoById(draft.who))):''} · ${dayLabel(draft.date)} · ${walletLabel(draft.wallet)}</div>
     ${draft.guessed?'<div class="guess">Hiểu là nghìn đồng. Gõ thêm “k” hoặc số đầy đủ nếu khác.</div>':''}</div>`;
   document.getElementById('cg').innerHTML=cats().map(x=>`<button data-cat="${x.id}" aria-pressed="${x.id===draft.cat}"><span>${x.icon}</span>${esc(x.name)}</button>`).join('');
   document.getElementById('wh').innerHTML=whoChips(draft.who,'who');
@@ -1305,10 +1434,43 @@ function commit(){
   if(!draft||!draft.amount) return;
   if(manualCat) learn(draft.note,manualCat);
   const c=catById(draft.cat), before=monthOf(draft.date)===monthOf(todayKey())?monthSpent(draft.cat):null;
-  put('tx',{id:uuid(),date:draft.date,note:draft.note||c.name,cat:draft.cat,amount:draft.amount,wallet:draft.wallet,who:draft.who||'me',draft:false,recurring_id:null,ts:Date.now()});
+  const nid=uuid();
+  put('tx',{id:nid,date:draft.date,note:draft.note||c.name,cat:draft.cat,amount:draft.amount,wallet:draft.wallet,who:draft.who||'me',draft:false,recurring_id:null,ts:Date.now()});
+  if(draft.place && draft.cat==='an'){ reviews()[nid]={place:draft.place,dish:draft.note||c.name,cuisine:cuisineOf(draft.note).c,date:draft.date,amount:draft.amount,who:draft.who||'me'}; saveSettings(); }
   const warn = before!==null ? checkBudget(draft.cat,before,monthSpent(draft.cat)) : '';
   toast(warn?'⚠️ '+warn:'Đã lưu '+fmt(draft.amount)+'đ · '+c.name+(draft.who!=='me'?' · '+whoText(whoById(draft.who)):''), warn?3500:2400);
   closeSheet();
+}
+
+
+/* --- chấm điểm quán --- */
+const SCORE_TXT = s => !s?'Chọn điểm':s<=4?'Không quay lại':s<=6?'Tạm được':s<=8?'Ngon':'Phải quay lại';
+function openRate(id){
+  const x=S.tx.find(t=>t.id===id); if(!x) return;
+  const r=reviews()[id]||{};
+  let score=r.score||0, cui=r.cuisine||(()=>{ const g=cuisineOf(x.note); return g.c==='uong'?'vn':g.c; })();
+  const places=[...new Set(reviewList().map(v=>v.place).concat(Object.values(reviews()).map(v=>v.place)).filter(Boolean))].slice(0,40);
+  openSheet(`${sheetHead('Chấm điểm bữa ăn')}
+  <div class="preview"><span class="dot" style="background:var(--peach)">${itemEmoji(x)}</span><div style="min-width:0"><div class="pa" style="font-size:22px">${esc(x.note)}</div><div class="pm num">${fmt(x.amount)}đ · ${dayLabel(x.date)}${whoOf(x)!=='me'?' · '+esc(whoText(whoById(whoOf(x)))):''}</div></div></div>
+  <label class="field">Quán<input id="rp" list="rpl" value="${esc(r.place||'')}" placeholder="vd Bún bò Bà Năm, Q.1" autocomplete="off"></label>
+  <datalist id="rpl">${places.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>
+  <div class="sec-l">Điểm · <span id="rs-txt">${SCORE_TXT(score)}</span></div>
+  <div class="score" id="rs">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button data-sc="${n}" aria-pressed="${n===score}">${n}</button>`).join('')}</div>
+  <div class="sec-l">Ẩm thực</div>
+  <div class="filters" id="rc">${Object.entries(CUISINES).map(([k,v])=>`<button class="pill" data-rc="${k}" aria-pressed="${k===cui}">${v.f} ${v.n}</button>`).join('')}</div>
+  <label class="field">Nhận xét ngắn<input id="rv" value="${esc(r.review||'')}" maxlength="120" placeholder="vd nước dùng đậm, hơi mặn, phục vụ nhanh"></label>
+  <p class="lbl">AI dùng điểm này để gợi ý quay lại quán ngon và tránh quán dở.</p>
+  <button class="primary" id="rsave">Lưu đánh giá</button>${r.score?'<button class="danger" id="rdel">Xoá đánh giá</button>':''}`);
+  document.getElementById('rs').onclick=e=>{ const b=e.target.closest('[data-sc]'); if(!b) return; score=+b.dataset.sc;
+    document.querySelectorAll('[data-sc]').forEach(y=>y.setAttribute('aria-pressed',+y.dataset.sc===score)); document.getElementById('rs-txt').textContent=SCORE_TXT(score); };
+  document.getElementById('rc').onclick=e=>{ const b=e.target.closest('[data-rc]'); if(!b) return; cui=b.dataset.rc;
+    document.querySelectorAll('[data-rc]').forEach(y=>y.setAttribute('aria-pressed',y.dataset.rc===cui)); };
+  document.getElementById('rsave').onclick=()=>{
+    if(!score){ toast('Chọn điểm từ 1 đến 10'); return; }
+    reviews()[id]={place:val('rp').trim().slice(0,60),score,cuisine:cui,review:val('rv').trim().slice(0,120),dish:x.note,date:x.date,amount:x.amount,who:whoOf(x)};
+    saveSettings(); toast('Đã lưu '+score+'/10'+(val('rp').trim()?' cho '+val('rp').trim():'')); closeSheet();
+  };
+  const del=document.getElementById('rdel'); if(del) armDelete(del,()=>{ delete reviews()[id]; saveSettings(); toast('Đã xoá đánh giá'); closeSheet(); });
 }
 
 /* --- sửa giao dịch --- */
@@ -1323,6 +1485,7 @@ function openEdit(id){
   <div class="catgrid" id="ecg">${cats().map(c=>`<button data-ecat="${c.id}" aria-pressed="${c.id===cat}"><span>${c.icon}</span>${esc(c.name)}</button>`).join('')}</div>
   <div class="sec-l">Chi cho ai</div>
   <div class="whos" id="ewh" role="group" aria-label="Chi cho ai">${whoChips(who,'ewho')}</div>
+  ${x.cat==='an'&&!x.draft?`<button class="secondary" data-rate="${x.id}">⭐ ${(reviews()[x.id]||{}).score?'Đã chấm '+reviews()[x.id].score+'/10'+(reviews()[x.id].place?' · '+esc(reviews()[x.id].place):'')+' · sửa':'Chấm điểm quán'}</button>`:''}
   <button class="primary" id="esave">${x.draft?'Xác nhận khoản này':'Lưu thay đổi'}</button>
   <button class="danger" id="edel">${x.draft?'Bỏ qua tháng này':'Xoá khoản này'}</button>`);
   document.getElementById('ew').value=x.wallet;
@@ -1610,15 +1773,19 @@ document.addEventListener('click',async e=>{
   const wh=t.closest('[data-who]'); if(wh){ manualWho=wh.dataset.who; draft.who=manualWho; paintDraft(); return; }
   const fw=t.closest('[data-fw]'); if(fw){ filterWho=fw.dataset.fw; render(); return; }
   const wj=t.closest('[data-whojump]'); if(wj){ filterWho=wj.dataset.whojump; filterCat='all'; listMonth=current()==='tong-quan'?monthOf(todayKey()):'all'; location.hash='#giao-dich'; return; }
-  const em=t.closest('[data-eatmeal]'); if(em){ eat.meal=em.dataset.eatmeal; eat.reroll=(store.get('hct_eat_'+todayKey()+'_'+eat.meal+'_'+eat.people,null)||{}).reroll||0; render(); return; }
-  const ep=t.closest('[data-eatppl]'); if(ep){ eat.people=+ep.dataset.eatppl; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
+  const em=t.closest('[data-eatmeal]'); if(em){ eat.meal=em.dataset.eatmeal; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
+  const eg=t.closest('[data-eatgrp]'); if(eg){ eat.group=eg.dataset.eatgrp; eat.people=eat.group==='mot'?1:eat.group==='hai'?2:Math.max(3,eat.people>2?eat.people:4); eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
+  const en=t.closest('[data-eatn]'); if(en){ eat.people=Math.min(12,Math.max(3,eat.people+ +en.dataset.eatn)); eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
   const ea=t.closest('[data-eat]'); if(ea){
     if(ea.dataset.eat==='ai'){ askAI(); return; }
     const c=store.get(eatKey(),null); if(c && c.reroll===eat.reroll && aiAvail && mode==='cloud'){ askAI(); return; }
     eat.reroll++; render(); return; }
   const pick=t.closest('[data-eatpick]'); if(pick){ const d=eatItems()[+pick.dataset.eatpick]; if(d){
-    const total=d.gia*eat.people, amt=total%1000===0?(total/1000)+'k':String(total);
-    openAdd(`${d.ten} ${amt}${eat.people>1?' chung':''}`,'an'); } return; }
+    const total=d.gia*(eat.group==='hai'?2:1), amt=total%1000===0?(total/1000)+'k':String(total);
+    openAdd(`${d.ten} ${amt}${d.quan?' @'+d.quan:''}`,'an'); } return; }
+  const ec=t.closest('[data-eatcui]'); if(ec){ eat.cui=ec.dataset.eatcui; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
+  const rt=t.closest('[data-rate]'); if(rt){ openRate(rt.dataset.rate); return; }
+  const rs=t.closest('[data-rateskip]'); if(rs){ const id=rs.dataset.rateskip; reviews()[id]={...(reviews()[id]||{}),skip:true}; saveSettings(); render(); return; }
   const pw=t.closest('[data-potwho]'); if(pw){ potWho=pw.dataset.potwho; render(); return; }
   const cd=t.closest('[data-catdel]'); if(cd){
     if(!cd.classList.contains('armed')){ cd.classList.add('armed'); cd.textContent='?'; cd.style.background='var(--bad)'; cd.style.color='var(--surface)'; cd.setAttribute('aria-label','Bấm lần nữa để xoá'); return; }

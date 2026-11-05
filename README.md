@@ -74,6 +74,12 @@ API key chỉ nằm trên máy chủ Cloudflare (`functions/api/goi-y.js`), khô
 
 Sau khi thêm biến: Deployments → bản mới nhất → **Retry deployment** thì key mới có hiệu lực.
 
+**Ăn với ai:** Một mình / 2 người (ghi tiền cả 2 phần, sửa lại nếu chia đôi) / Nhóm 3–12 người (mỗi người tự trả, ghi phần của mình, ưu tiên món ăn chung).
+
+**Ẩm thực:** Tự chọn (app tự đổi vị khi dạo này ăn lệch một kiểu) · Việt đồ nước · Việt cơm/khô · Hàn · Nhật · Thái · Trung · Âu Mỹ. Thẻ hiện thống kê 7 ngày, Báo cáo có thẻ "Ăn theo ẩm thực".
+
+**Chấm điểm quán:** gõ `bún bò 50k @Bà Năm` để ghi tên quán. Ăn xong, Tổng quan hỏi "ngon không?", hoặc bấm vào khoản chi → Chấm điểm quán (1–10, ẩm thực, nhận xét). Báo cáo có "Sổ tay quán ăn". AI dùng quán ≥ 8 điểm để gợi ý quay lại và tránh quán ≤ 5 điểm. Điểm lưu trong `hct_settings.data.reviews` nên không cần thêm cột Supabase.
+
 Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.mjs`
 
 ## Phát triển tiếp

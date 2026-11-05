@@ -77,12 +77,14 @@ function extractJson(text) {
   return JSON.parse(s.slice(a, b + 1));
 }
 
+const CUI_CODE = { 'Việt': 'vn', 'Hàn': 'han', 'Nhật': 'nhat', 'Thái': 'thai', 'Trung': 'trung', 'Âu Mỹ': 'au', 'Khác': 'khac' };
 const MEALS = { sang: 'bữa sáng', trua: 'bữa trưa', toi: 'bữa tối', vat: 'ăn vặt / đồ uống buổi chiều' };
 
 function buildPrompt(q) {
   const lines = [
     'Bạn là người bạn sành ăn sống ở TP.HCM, giúp một người trẻ đi làm chọn món cho hợp túi tiền.',
-    `Gợi ý đúng 3 lựa chọn cho ${MEALS[q.meal] || 'bữa ăn'} hôm nay (${q.today}), ăn cho ${q.people > 1 ? q.people + ' người (mình và em trai)' : '1 người'}.`,
+    `Gợi ý đúng 3 lựa chọn cho ${MEALS[q.meal] || 'bữa ăn'} hôm nay (${q.today}), ${q.group === 'nhom' ? `đi ăn nhóm ${q.people} người bạn, mỗi người tự trả phần mình` : q.group === 'hai' ? 'đi ăn 2 người' : 'ăn một mình'}.`,
+    ...(q.group === 'nhom' ? ['Ăn nhóm: ưu tiên quán ngồi được đông, món ăn chung vui (lẩu, nướng, ốc, gà rán, dimsum, pizza...), không gợi ý tự nấu; "gia" vẫn là giá mỗi người.'] : []),
     `Ngân sách cho bữa này: khoảng ${q.perMeal.toLocaleString('vi-VN')}đ mỗi người.`,
   ];
   if (q.recent.length) lines.push('Những món đã ăn gần đây, mới nhất trước: ' + q.recent.join('; ') + '.');
@@ -90,6 +92,11 @@ function buildPrompt(q) {
   if (q.avoid) lines.push('Tuyệt đối không gợi ý món có: ' + q.avoid + '.');
   if (q.note) lines.push('Ghi chú thêm: ' + q.note + '.');
   if (q.exclude.length) lines.push('Đã gợi ý rồi, không lặp lại: ' + q.exclude.join(', ') + '.');
+  if (q.stats) lines.push('Ẩm thực đã ăn 7 ngày qua (số bữa): ' + q.stats + '.');
+  if (q.cuisine) lines.push('Người dùng muốn ăn: ' + q.cuisine + '. Cả 3 lựa chọn phải thuộc đúng loại này' + (/đồ nước/.test(q.cuisine) ? ' (món Việt có nước dùng: phở, bún, hủ tiếu, bánh canh, cháo, miến, lẩu...)' : /cơm, khô/.test(q.cuisine) ? ' (món Việt dạng cơm hoặc khô, không có nước dùng)' : '') + '.');
+  else lines.push('Không chỉ định ẩm thực: dựa vào thống kê, nếu dạo này ăn lệch một kiểu thì gợi ý ít nhất một món thuộc ẩm thực khác (Hàn, Nhật, Thái, Trung, Âu Mỹ hoặc Việt kiểu khác).');
+  if (q.good.length) lines.push('Món/quán người dùng đã chấm điểm cao (có thể gợi ý QUAY LẠI một quán phù hợp, khi đó ghi đúng tên quán vào "quan"): ' + q.good.join('; ') + '.');
+  if (q.bad.length) lines.push('Món/quán bị chấm điểm thấp, KHÔNG gợi ý lại quán này và cân nhắc tránh kiểu món đó: ' + q.bad.join('; ') + '.');
   lines.push(
     '',
     'Quy tắc:',
@@ -100,8 +107,9 @@ function buildPrompt(q) {
     '- "loi_khuyen": một câu ngắn tối đa 20 từ về chuyện ăn uống/chi tiêu dựa trên dữ liệu ở trên, giọng thân thiện, không phán xét.',
     '',
     'Chỉ trả về JSON đúng mẫu, không thêm chữ nào khác:',
-    '{"goi_y":[{"ten":"Bún bò Huế","emoji":"🍜","gia":45000,"cach":"quán","ly_do":"..."}],"loi_khuyen":"..."}',
-    '"cach" là một trong: "quán", "giao hàng", "tự nấu". "emoji" là đúng một emoji món ăn.'
+    '{"goi_y":[{"ten":"Bún bò Huế","emoji":"🍜","gia":45000,"cach":"quán","quoc_gia":"Việt","quan":"","ly_do":"..."}],"loi_khuyen":"..."}',
+    '"cach" là một trong: "quán", "giao hàng", "tự nấu". "quoc_gia" là một trong: "Việt", "Hàn", "Nhật", "Thái", "Trung", "Âu Mỹ", "Khác".',
+    '"quan" chỉ điền khi gợi ý quay lại đúng một quán trong danh sách đã chấm điểm cao, còn lại để "". "emoji" là đúng một emoji món ăn.'
   );
   return lines.join('\n');
 }
@@ -111,6 +119,7 @@ function shape(out) {
   const items = arr.slice(0, 3).map(x => ({
     ten: clip(x.ten, 60), emoji: clip(x.emoji, 8) || '🍽️', gia: num(x.gia, 0, 2000000, 0),
     cach: ['quán', 'giao hàng', 'tự nấu'].includes(x.cach) ? x.cach : 'quán', ly_do: clip(x.ly_do, 140),
+    cui: CUI_CODE[clip(x.quoc_gia, 20)] || '', quan: clip(x.quan, 60),
   })).filter(x => x.ten);
   if (!items.length) throw new Error('AI không đưa ra món nào');
   return { items, tip: clip(out.loi_khuyen, 160) };
@@ -135,12 +144,15 @@ export async function onRequestPost({ request, env }) {
   let body; try { body = await request.json(); } catch { return json({ error: 'Dữ liệu gửi lên không hợp lệ.' }, 400); }
   const q = {
     meal: ['sang', 'trua', 'toi', 'vat'].includes(body.meal) ? body.meal : 'trua',
-    people: num(body.people, 1, 6, 1),
+    people: num(body.people, 1, 12, 1),
+    group: body.group === 'em' ? 'hai' : ['mot', 'hai', 'nhom'].includes(body.group) ? body.group : (num(body.people, 1, 12, 1) > 2 ? 'nhom' : num(body.people, 1, 12, 1) === 2 ? 'hai' : 'mot'),
     perMeal: num(body.perMeal, 10000, 1000000, 45000),
     today: clip(body.today, 40),
     recent: list(body.recent, 30, 60),
     exclude: list(body.exclude, 15, 60),
     likes: clip(body.likes, 200), avoid: clip(body.avoid, 200), note: clip(body.note, 200),
+    cuisine: clip(body.cuisine, 40), stats: clip(body.cuisineStats, 200),
+    good: list(body.good, 10, 160), bad: list(body.bad, 8, 160),
   };
   const prompt = buildPrompt(q);
   const errs = [];
