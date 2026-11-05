@@ -841,7 +841,7 @@ function viewSettings(){
     <p class="lbl">Đang lưu <b>chỉ trên máy này</b>. Bấm Kết nối để đồng bộ giữa iPhone và máy tính. Ô trống thì dùng project mặc định.</p>
     <label class="field">Project URL<input id="cfg-url" placeholder="https://xxxx.supabase.co" value="${esc(cfg.url)}" autocomplete="off"></label>
     <label class="field">anon public key<input id="cfg-key" placeholder="eyJhbGciOi…" value="${esc(cfg.key)}" autocomplete="off"></label>
-    ${!window.supabase?'<p class="err">Không tải được thư viện Supabase ở trang này. Hãy dùng bản đã deploy lên Netlify.</p>':''}
+    ${!window.supabase?'<p class="err">Không tải được thư viện Supabase ở trang này. Hãy dùng bản đã deploy lên Cloudflare.</p>':''}
     <button class="primary" data-act="cfg-save">Kết nối và đăng nhập</button>`;
   return `${mobileTop('Cài đặt')}
   <div class="page-h"><h2>Cài đặt</h2></div>

@@ -16,7 +16,7 @@ index.html             app
 manifest.webmanifest   cài lên màn hình chính
 sw.js                  service worker (mở được khi mất mạng)
 icon-*.png             icon
-netlify.toml           cấu hình Netlify
+_headers               header cho Cloudflare Pages
 supabase/schema.sql    tạo bảng + phân quyền trên Supabase
 ```
 
@@ -31,20 +31,20 @@ Muốn dựng lại trên project khác: chạy `supabase/schema.sql` trong SQL 
 **Tạo tài khoản đăng nhập:** project đang tắt đăng ký công khai (để bảo vệ shop), nên tạo tài khoản trong dashboard:
 Authentication → Users → **Add user → Create new user** → nhập email và mật khẩu → tick **Auto Confirm User** → Create.
 
-### 2. Netlify (tự deploy mỗi lần push)
+### 2. Cloudflare Pages (tự deploy mỗi lần push)
 
-Site đã được nối với repo này. Mỗi lần push lên `main`, Netlify tự deploy lại sau khoảng 30 giây.
+Project Cloudflare Pages `hu-chi-tieu` đã được nối với repo này: không có build command, thư mục xuất là gốc repo. Mỗi lần push lên `main`, Cloudflare tự deploy lại sau khoảng 30 giây.
 
 ### 3. Đăng nhập
 
-Mở link Netlify → **Đăng nhập** bằng email và mật khẩu vừa tạo. Dữ liệu tự đồng bộ giữa các máy.
+Mở link Cloudflare (`*.pages.dev`) → **Đăng nhập** bằng email và mật khẩu vừa tạo. Dữ liệu tự đồng bộ giữa các máy.
 "Quên mật khẩu?" sẽ gửi link đặt lại tới email, nhớ mở link đó trên cùng máy.
 
 ### 4. iPhone
 
-1. Mở link Netlify bằng **Safari** → **Chia sẻ → Thêm vào MH chính**.
+1. Mở link Cloudflare (`*.pages.dev`) bằng **Safari** → **Chia sẻ → Thêm vào MH chính**.
 2. Mở app từ icon → đăng nhập bằng email + mật khẩu → **Cài đặt → Khoá bằng Face ID**.
-3. Back Tap: app **Phím tắt** → tạo phím tắt **Mở URL** `https://<site>.netlify.app/#nhap` → **Cài đặt → Trợ năng → Cảm ứng → Chạm vào mặt sau → Chạm hai lần** → chọn phím tắt đó.
+3. Back Tap: app **Phím tắt** → tạo phím tắt **Mở URL** `https://<site>.pages.dev/#nhap` → **Cài đặt → Trợ năng → Cảm ứng → Chạm vào mặt sau → Chạm hai lần** → chọn phím tắt đó.
    Phím tắt sẽ mở Safari, nên cần đăng nhập trong Safari một lần nữa.
 
 ## Cách gõ
@@ -64,6 +64,6 @@ Nếu app đoán sai danh mục, chọn lại một lần, lần sau app sẽ t�
 
 ## Phát triển tiếp
 
-- Sửa `index.html` → commit → push → Netlify tự deploy.
+- Sửa `index.html` → commit → push → Cloudflare tự deploy.
 - Khi đổi `sw.js`, tăng `CACHE = 'hct-vN'` để máy người dùng nhận bản mới.
 - Ý tưởng: đọc biến động số dư qua Casso/SePay (webhook → Supabase Edge Function), quản lý thu nhập, chia tiền nhóm.
