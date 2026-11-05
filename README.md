@@ -90,6 +90,13 @@ Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.m
 - **Gợi ý quán gần bạn** (Cài đặt → Khẩu vị): khi bấm Hỏi AI, app gửi vị trí làm tròn khoảng 100 m, Gemini dùng Google Maps để chọn quán có thật trong khoảng 3 km, kèm link quán. Nếu tính năng Google Maps của Gemini lỗi, app tự gợi ý như thường. Dùng chung `GEMINI_API_KEY`, không cần key Google Maps riêng.
 - Dữ liệu lưu trong `hct_settings.data` (`menu`, `places`) nên không cần thêm cột Supabase.
 
+## Hẹn ăn nhóm
+
+- Trong app: **Kế hoạch → Hẹn ăn nhóm** (hoặc nút 📅 Hẹn nhóm khi chọn "Nhóm" trong thẻ Hôm nay ăn gì). Tạo buổi hẹn gồm tên, tuần, lời nhắn, địa điểm và món gợi ý cho nhóm, rồi gửi link `hen.html#<mã>` vào nhóm chat.
+- Bạn bè mở link **không cần tài khoản**: nhập tên, chạm vào các ô Sáng/Tối trong tuần (chạm 1 lần là rảnh ✓, 2 lần là có thể ?, 3 lần là bỏ), bình chọn hoặc đề xuất món, ghi chú dị ứng. Ai cũng thấy lịch của cả nhóm, ô càng xanh càng nhiều người rảnh, kèm danh sách 3 khung giờ hợp nhất.
+- Người tạo (đã đăng nhập) chốt giờ, món và địa điểm; mọi người thấy nút **Thêm vào Google Calendar** và **Đường tới quán**.
+- Cài đặt Supabase một lần: chạy `supabase/hen.sql` trong SQL Editor. Bạn bè chỉ gọi được 2 hàm `hct_meet_get` / `hct_meet_vote` khi biết mã trong link. Mỗi trình duyệt có khoá riêng nên không ai sửa được tên của người khác.
+
 ## Phát triển tiếp
 
 - Sửa `index.html` → commit → push → Cloudflare tự deploy.

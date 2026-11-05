@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hẹn ăn nhóm · Hũ Chi Tiêu</title>
+<meta name="description" content="Chọn khung giờ cả nhóm cùng rảnh và món muốn ăn.">
+<meta property="og:title" content="Hẹn ăn nhóm">
+<meta property="og:description" content="Bấm vào để chọn giờ bạn rảnh trong tuần, cả nhóm đều thấy.">
+<meta name="theme-color" content="#FFF4EE">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+/* Layout: một cột cho điện thoại, lưới tuần 7 hàng × 2 khung (Sáng / Tối) */
+:root{
+  --bg:#FFF4EE; --surface:#FFFFFF; --sunk:#FCE9E1; --ink:#3A2A3F; --muted:#8C7A8E; --line:#F1DCD3;
+  --accent:#EE7FA0; --accent-ink:#FFFFFF; --accent-soft:#FFDCE6; --mint:#BFE8D8; --mint-ink:#2F7F63;
+  --butter:#FFEBA8; --warn:#C98424; --bad:#D9556F; --lilac:#DCD0F7;
+  --heat0:#FCE9E1; --heat1:#6CC4A4;
+  --shadow:0 6px 20px rgba(196,120,140,.14);
+  --f-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif; --f-body:"Be Vietnam Pro",system-ui,-apple-system,sans-serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#211A29; --surface:#2C2336; --sunk:#372C43; --ink:#F6EAF2; --muted:#B5A3BA; --line:#43364F;
+  --accent:#F49AB6; --accent-ink:#2A1A26; --accent-soft:#4A2E40; --mint:#2F4D45; --mint-ink:#7FD3B2;
+  --butter:#4D4430; --warn:#F0C46A; --bad:#F48C9F; --lilac:#3E3560; --heat0:#372C43; --heat1:#3E9C7C;
+  --shadow:0 6px 20px rgba(0,0,0,.35); color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit} button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:10px}
+[hidden]{display:none!important}
+h1,h2{font-family:var(--f-display);margin:0;line-height:1.15;text-wrap:balance}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:640px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.jar{width:30px;height:30px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:800}
+h1{font-size:30px}
+.sub{color:var(--muted);font-size:14px}
+.card{background:var(--surface);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.card h2{font-size:19px}
+.lbl{color:var(--muted);font-size:13px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.field input{padding:12px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:16px;width:100%}
+.btn{padding:10px 16px;border-radius:14px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.ghost{background:var(--sunk);color:var(--ink)}
+.btn-s{font-size:13px;font-weight:600;padding:7px 12px;border-radius:12px;background:var(--accent-soft);color:var(--ink);text-decoration:none;display:inline-block}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.chosen{background:var(--mint);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.chosen b{font-family:var(--f-display);font-size:24px;line-height:1.2}
+.best{display:flex;flex-direction:column;gap:6px}
+.best-i{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.best-i:first-of-type{border-top:0}
+.rank{width:30px;height:30px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;font-weight:700;font-size:13px}
+.best-i small{display:block;color:var(--muted);font-size:12.5px}
+.full{background:var(--mint);color:var(--mint-ink)}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:5px;vertical-align:-2px;margin-right:4px}
+.grid{display:grid;grid-template-columns:78px 1fr 1fr;gap:8px;align-items:stretch}
+.gh{font-size:12.5px;color:var(--muted);font-weight:600;text-align:center;text-transform:uppercase;letter-spacing:.05em}
+.day{display:flex;flex-direction:column;justify-content:center;font-weight:600;font-size:14px;line-height:1.2}
+.day small{color:var(--muted);font-weight:400;font-size:12px}
+.day.past{opacity:.45}
+.cell{position:relative;min-height:62px;border-radius:16px;padding:8px 10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;border:2.5px solid transparent;background:var(--heat0);transition:transform .08s}
+.cell:active{transform:scale(.97)}
+.cell .cnt{font-weight:700;font-size:15px}
+.cell .who{font-size:11.5px;line-height:1.25;opacity:.85;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cell .me{position:absolute;top:6px;right:8px;font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px}
+.cell.yes{border-color:var(--mint-ink)} .cell.yes .me{background:var(--mint-ink);color:var(--surface)}
+.cell.maybe{border-color:var(--warn);border-style:dashed} .cell.maybe .me{background:var(--warn);color:var(--surface)}
+.cell.top{box-shadow:0 0 0 3px var(--accent)}
+.cell.pick{box-shadow:0 0 0 4px var(--ink)}
+.cell:disabled{opacity:.45;cursor:default}
+@media (prefers-reduced-motion:reduce){.cell{transition:none}}
+
+.foods{display:flex;flex-direction:column;gap:8px}
+.food{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:var(--sunk);text-align:left;border:2px solid transparent;width:100%}
+.food[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.food .e{font-size:28px;text-align:center}
+.food small{display:block;color:var(--muted);font-size:12.5px}
+.food .v{font-weight:700}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.people{display:flex;flex-direction:column}
+.p{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.p:first-child{border-top:0}
+.p small{color:var(--muted)}
+.save{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:var(--surface);border-top:1px solid var(--line)}
+.save .in{max-width:640px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.save .st{flex:1;font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:30;font-size:14px;max-width:calc(100% - 32px);text-align:center}
+.empty{text-align:center;color:var(--muted);padding:40px 16px}
+.err{color:var(--bad);font-size:13px}
+.owner{border:2px dashed var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Đang mở lịch hẹn…</div></div>
+<div class="save" id="savebar" hidden><div class="in"><span class="st" id="st"></span><button class="btn" id="savebtn">Lưu lịch của tôi</button></div></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
+const SLOTS = [['sang','Sáng','08:00','11:00'],['toi','Tối','18:00','21:00']];
+const DOW = ['CN','T2','T3','T4','T5','T6','T7'];
+const DOW_FULL = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = { get(k,f){ try{ const v=localStorage.getItem(k); return v==null?f:JSON.parse(v); }catch(e){ return f; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+const dayKey = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addDays = (k,n) => { const d=new Date(k+'T12:00:00'); d.setDate(d.getDate()+n); return dayKey(d); };
+const fmtD = k => { const d=new Date(k+'T12:00:00'); return d.getDate()+'/'+(d.getMonth()+1); };
+const slotLabel = s => { const [k,sl]=s.split('|'); const d=new Date(k+'T12:00:00'); return DOW_FULL[d.getDay()]+' '+fmtD(k)+' · '+(SLOTS.find(x=>x[0]===sl)||[,''])[1]; };
+const fmtK = n => n>=1e6?(n/1e6).toLocaleString('vi-VN',{maximumFractionDigits:1})+'tr':Math.round(n/1000)+'k';
+const mapsSearch = q => 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);
+function toast(m,ms=2400){ const t=$('toast'); t.textContent=m; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,ms); }
+function newKey(){ const a=new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a,b=>b.toString(16).padStart(2,'0')).join(''); }
+
+const token = decodeURIComponent((location.hash||'').slice(1)).trim();
+const myKey = store.get('hct_hen_key',null) || (()=>{ const k=newKey(); store.set('hct_hen_key',k); return k; })();
+let me = { name: store.get('hct_hen_name',''), slots:{}, foods:new Set(), note:'' };
+let M = null, dirty = false, saving = false, sb = null, mine = null;
+
+function init(){
+  if(!token){ $('app').innerHTML='<div class="empty">Link thiếu mã buổi hẹn. Hỏi lại người gửi link nhé.</div>'; return; }
+  if(!window.supabase){ $('app').innerHTML='<div class="empty">Không tải được trang. Kiểm tra mạng rồi tải lại.</div>'; return; }
+  sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  load(true);
+  setInterval(()=>{ if(!document.hidden && !dirty && !saving) load(false); }, 20000);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && !dirty) load(false); });
+}
+async function load(first){
+  const {data,error} = await sb.rpc('hct_meet_get',{p_token:token});
+  if(error){ $('app').innerHTML=`<div class="empty">Chưa mở được buổi hẹn.<br><span class="err">${esc(/function|does not exist|schema cache/i.test(error.message)?'Chủ buổi hẹn chưa cài phần Hẹn ăn trên Supabase.':error.message)}</span></div>`; return; }
+  if(!data){ $('app').innerHTML='<div class="empty">Không tìm thấy buổi hẹn. Có thể link sai hoặc buổi hẹn đã bị xoá.</div>'; return; }
+  M = data;
+  if(first || !dirty) syncMine();
+  render();
+}
+function syncMine(){
+  mine = (M.votes||[]).find(v=>me.name && v.name.toLowerCase()===me.name.toLowerCase()) || null;
+  me.slots={}; me.foods=new Set(); me.note='';
+  if(mine){ (mine.slots||[]).forEach(s=>{ if(s[0]==='?') me.slots[s.slice(1)]='maybe'; else me.slots[s]='yes'; }); (mine.foods||[]).forEach(f=>me.foods.add(f)); me.note=mine.note||''; }
+}
+function tally(){
+  const t={}, votes=(M.votes||[]).filter(v=>!(mine && me.name && v.name.toLowerCase()===me.name.toLowerCase()));
+  const all=[...votes];
+  if(me.name) all.push({name:me.name,slots:Object.entries(me.slots).map(([k,v])=>v==='maybe'?'?'+k:k),foods:[...me.foods],note:me.note});
+  all.forEach(v=>(v.slots||[]).forEach(s=>{ const maybe=s[0]==='?', k=maybe?s.slice(1):s; const o=t[k]||(t[k]={yes:[],maybe:[]}); (maybe?o.maybe:o.yes).push(v.name); }));
+  return {t,all};
+}
+function render(){
+  const {t,all}=tally(), n=all.length, week=[...Array(7)].map((_,i)=>addDays(M.week_start,i)), today=dayKey(new Date());
+  const ranked=Object.entries(t).map(([k,o])=>({k,...o,score:o.yes.length+o.maybe.length*0.5})).filter(o=>o.score>0 && o.k.split('|')[0]>=today)
+    .sort((a,b)=>b.score-a.score||b.yes.length-a.yes.length||a.k.localeCompare(b.k)).slice(0,3);
+  const topKey=ranked[0]&&ranked[0].k;
+  const foodOpts=[...(M.foods||[])]; const extra=new Set();
+  all.forEach(v=>(v.foods||[]).forEach(f=>{ if(!foodOpts.some(o=>o.ten===f)) extra.add(f); }));
+  extra.forEach(f=>foodOpts.push({ten:f,emoji:'🍽️',moi:true}));
+  const fv={}; all.forEach(v=>(v.foods||[]).forEach(f=>fv[f]=(fv[f]||0)+1));
+  const maxFv=Math.max(1,...Object.values(fv));
+  const ch=M.chosen;
+  const calUrl=ch?(()=>{ const [k,sl]=ch.split('|'), s=SLOTS.find(x=>x[0]===sl)||SLOTS[1], d=k.replace(/-/g,'');
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(M.title+(M.chosen_food?' · '+M.chosen_food:''))+'&dates='+d+'T'+s[2].replace(':','')+'00/'+d+'T'+s[3].replace(':','')+'00&ctz=Asia/Ho_Chi_Minh&details='+encodeURIComponent((M.note||'')+'\n'+location.href)+(M.place?'&location='+encodeURIComponent(M.place):''); })():'';
+  $('app').innerHTML = `
+  <div class="brand"><span class="jar">H</span>Hẹn ăn nhóm · Hũ Chi Tiêu</div>
+  <div><h1>${esc(M.title)}</h1><div class="sub">Tuần ${fmtD(week[0])} – ${fmtD(week[6])} · ${n} người đã trả lời${M.place?' · 📍 '+esc(M.place):''}</div>
+    ${M.note?`<p style="margin:6px 0 0">${esc(M.note)}</p>`:''}</div>
+  ${ch?`<section class="chosen"><span class="lbl" style="color:inherit">✅ Đã chốt</span><b>${esc(slotLabel(ch))}</b>
+    ${M.chosen_food?`<span>Ăn <b style="font-size:inherit;font-family:inherit">${esc(M.chosen_food)}</b></span>`:''}
+    <div class="row"><a class="btn-s" href="${esc(calUrl)}" target="_blank" rel="noopener">📅 Thêm vào Google Calendar</a>
+    <a class="btn-s" href="${esc(mapsSearch(M.place||((M.chosen_food||'quán ăn')+' gần đây')))}" target="_blank" rel="noopener">🗺️ ${M.place?'Đường tới quán':'Tìm quán'}</a></div></section>`:''}
+  <section class="card">
+    <h2>Bạn là ai?</h2>
+    <label class="field">Tên của bạn (cả nhóm sẽ thấy)<input id="nm" value="${esc(me.name)}" maxlength="40" placeholder="vd Lan" autocomplete="nickname"></label>
+    ${me.name?'':'<p class="lbl">Nhập tên rồi chạm vào các ô bên dưới để báo giờ bạn rảnh.</p>'}
+  </section>
+  ${ranked.length?`<section class="card"><h2>Khung giờ hợp nhất</h2><div class="best">${ranked.map((o,i)=>`<div class="best-i"><span class="rank ${o.yes.length===n&&n>1?'full':''}">${i+1}</span>
+      <div><b>${esc(slotLabel(o.k))}</b><small>${o.yes.length===n&&n>1?'Cả đám đều rảnh · ':''}${esc(o.yes.join(', '))}${o.maybe.length?' · có thể: '+esc(o.maybe.join(', ')):''}</small></div>
+      <b class="num">${o.yes.length}/${n}</b></div>`).join('')}</div></section>`:''}
+  <section class="card">
+    <h2>Lịch tuần</h2>
+    <div class="legend"><span><i style="background:var(--heat1)"></i>nhiều người rảnh</span><span><i style="border:2.5px solid var(--mint-ink)"></i>bạn rảnh</span><span><i style="border:2.5px dashed var(--warn)"></i>bạn có thể</span></div>
+    <p class="lbl" style="margin:0">Chạm một lần: rảnh ✓ · lần hai: có thể ? · lần ba: bỏ.</p>
+    <div class="grid" role="grid" aria-label="Lịch tuần">
+      <span></span>${SLOTS.map(s=>`<span class="gh">${s[1]}</span>`).join('')}
+      ${week.map(k=>{ const d=new Date(k+'T12:00:00'), past=k<today;
+        return `<div class="day${past?' past':''}">${DOW[d.getDay()]}<small>${fmtD(k)}</small></div>`+SLOTS.map(([sl])=>{
+          const key=k+'|'+sl, o=t[key]||{yes:[],maybe:[]}, ratio=n?(o.yes.length+o.maybe.length*0.5)/n:0, my=me.slots[key];
+          const bg=`color-mix(in srgb, var(--heat1) ${Math.round(ratio*85)}%, var(--heat0))`;
+          return `<button class="cell ${my||''} ${key===topKey?'top':''} ${key===ch?'pick':''}" style="background:${bg}" data-cell="${key}" ${past?'disabled':''} aria-label="${esc(slotLabel(key))}: ${o.yes.length} người rảnh">
+            ${my?`<span class="me">${my==='yes'?'✓':'?'}</span>`:''}<span class="cnt num">${o.yes.length||o.maybe.length?o.yes.length:''}${o.maybe.length?`<small style="font-weight:500"> +${o.maybe.length}?</small>`:''}</span>
+            <span class="who">${esc(o.yes.join(', '))}</span></button>`; }).join(''); }).join('')}
+    </div>
+  </section>
+  <section class="card">
+    <h2>Ăn gì?</h2><p class="lbl" style="margin:0">Chọn những món bạn muốn ăn, chọn nhiều cũng được.</p>
+    <div class="foods">${foodOpts.map(f=>`<button class="food" data-food="${esc(f.ten)}" aria-pressed="${me.foods.has(f.ten)}"><span class="e">${esc(f.emoji||'🍽️')}</span>
+      <span><b>${esc(f.ten)}</b>${f.moi?' <small style="display:inline">· bạn bè đề xuất</small>':''}<small>${f.gia?'~'+fmtK(f.gia)+'/người':''}${f.quan?' · 📍 '+esc(f.quan):''}</small>
+      <span class="bar"><i style="width:${(fv[f.ten]||0)/maxFv*100}%"></i></span></span><span class="v num">${fv[f.ten]||0}</span></button>`).join('')||'<p class="lbl">Chưa có món nào, đề xuất bên dưới nhé.</p>'}</div>
+    <div class="row"><input id="newfood" class="field" style="flex:1;padding:10px 12px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);font-size:16px;min-width:0" maxlength="40" placeholder="Đề xuất món khác…"><button class="btn ghost" id="addfood">Thêm</button></div>
+    <label class="field">Ghi chú của bạn (dị ứng, không ăn được…)<input id="note" value="${esc(me.note)}" maxlength="120" placeholder="vd không ăn hải sản"></label>
+  </section>
+  ${n?`<section class="card"><h2>Cả nhóm</h2><div class="people">${all.map(v=>`<div class="p"><span><b>${esc(v.name)}</b>${v.note?` <small>· ${esc(v.note)}</small>`:''}</span><small class="num">${(v.slots||[]).filter(s=>s[0]!=='?').length} khung rảnh</small></div>`).join('')}</div></section>`:''}
+  ${M.is_owner?`<section class="card owner"><h2>Bạn là người tạo hẹn</h2>
+    <p class="lbl" style="margin:0">Chốt để cả nhóm thấy giờ và món cuối cùng.</p>
+    <div class="row">${ranked.length?`<button class="btn" data-choose="${ranked[0].k}">Chốt ${esc(slotLabel(ranked[0].k))}</button>`:''}${ch?'<button class="btn ghost" data-choose="">Bỏ chốt giờ</button>':''}</div>
+    ${foodOpts.length?`<div class="row">${foodOpts.slice().sort((a,b)=>(fv[b.ten]||0)-(fv[a.ten]||0)).slice(0,4).map(f=>`<button class="btn-s" data-choosefood="${esc(f.ten)}">${M.chosen_food===f.ten?'✓ ':''}${esc(f.ten)} (${fv[f.ten]||0})</button>`).join('')}</div>`:''}
+    <label class="field">Địa điểm<input id="place" value="${esc(M.place||'')}" maxlength="80" placeholder="vd Lẩu Thái Bà Năm, Q.1"></label>
+    <div class="row"><button class="btn ghost" id="saveplace">Lưu địa điểm</button><button class="btn-s" id="share">Gửi link cho nhóm</button></div></section>`:
+    `<div class="row" style="justify-content:center"><button class="btn-s" id="share">Gửi link này cho người khác</button></div>`}
+  `;
+  bind();
+  updateBar();
+}
+function bind(){
+  const nm=$('nm');
+  nm.onchange=()=>{ const v=nm.value.trim().slice(0,40); if(v===me.name) return;
+    const had=me.name; me.name=v; store.set('hct_hen_name',v);
+    const exists=(M.votes||[]).find(x=>x.name.toLowerCase()===v.toLowerCase());
+    if(exists){ mine=exists; syncMine(); } else if(had){ mine=null; dirty=Object.keys(me.slots).length>0; }
+    render(); };
+  document.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{
+    if(!me.name){ toast('Nhập tên của bạn trước nhé'); $('nm').focus(); return; }
+    const k=b.dataset.cell, cur=me.slots[k]; if(!cur) me.slots[k]='yes'; else if(cur==='yes') me.slots[k]='maybe'; else delete me.slots[k];
+    dirty=true; render(); scheduleSave(); });
+  document.querySelectorAll('[data-food]').forEach(b=>b.onclick=()=>{
+    if(!me.name){ toast('Nhập tên của bạn trước nhé'); $('nm').focus(); return; }
+    const f=b.dataset.food; me.foods.has(f)?me.foods.delete(f):me.foods.add(f); dirty=true; render(); scheduleSave(); });
+  const add=()=>{ const v=$('newfood').value.trim(); if(!v) return; if(!me.name){ toast('Nhập tên của bạn trước nhé'); return; }
+    if(me.foods.size>=12){ toast('Tối đa 12 món'); return; } me.foods.add(v); dirty=true; render(); scheduleSave(); };
+  $('addfood').onclick=add; $('newfood').onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } };
+  $('note').onchange=()=>{ if(!me.name) return; me.note=$('note').value.trim(); dirty=true; scheduleSave(); };
+  const sh=$('share'); if(sh) sh.onclick=shareLink;
+  document.querySelectorAll('[data-choose]').forEach(b=>b.onclick=()=>ownerUpdate({chosen:b.dataset.choose||null},b.dataset.choose?'Đã chốt giờ':'Đã bỏ chốt'));
+  document.querySelectorAll('[data-choosefood]').forEach(b=>b.onclick=()=>ownerUpdate({chosen_food:M.chosen_food===b.dataset.choosefood?null:b.dataset.choosefood},'Đã chốt món'));
+  const sp=$('saveplace'); if(sp) sp.onclick=()=>ownerUpdate({place:$('place').value.trim()},'Đã lưu địa điểm');
+}
+let saveT=null;
+function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(save,900); updateBar(); }
+function updateBar(){
+  const bar=$('savebar'); bar.hidden=!me.name;
+  $('st').textContent = saving?'Đang lưu…':dirty?'Có thay đổi chưa lưu':(mine?'Đã lưu · '+Object.values(me.slots).filter(x=>x==='yes').length+' khung rảnh':'Chạm vào ô để báo giờ rảnh');
+  $('savebtn').disabled=saving;
+}
+$('savebtn').onclick=()=>{ clearTimeout(saveT); save(); };
+async function save(){
+  if(!me.name || saving) return;
+  saving=true; updateBar();
+  const slots=Object.entries(me.slots).map(([k,v])=>v==='maybe'?'?'+k:k);
+  const {data,error}=await sb.rpc('hct_meet_vote',{p_token:token,p_name:me.name,p_key:myKey,p_slots:slots,p_foods:[...me.foods],p_note:me.note});
+  saving=false;
+  if(error){ toast(error.message.replace(/^.*?: /,''),4000); updateBar(); return; }
+  dirty=false; M=data; mine=(M.votes||[]).find(v=>v.name.toLowerCase()===me.name.toLowerCase())||null; render(); toast('Đã lưu, cả nhóm đều thấy');
+}
+async function ownerUpdate(patch,msg){
+  const {error}=await sb.from('hct_meetups').update(patch).eq('id',M.id);
+  if(error){ toast('Không lưu được: '+error.message,4000); return; }
+  toast(msg); load(false);
+}
+async function shareLink(){
+  const url=location.href, text=`${M.title}: chọn giờ bạn rảnh tuần ${fmtD(M.week_start)} – ${fmtD(addDays(M.week_start,6))} nhé`;
+  try{ if(navigator.share){ await navigator.share({title:M.title,text,url}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  try{ await navigator.clipboard.writeText(url); toast('Đã sao chép link'); }catch(e){ prompt('Sao chép link này:',url); }
+}
+window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+init();
+</script>
+</body>
+</html>

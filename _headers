@@ -10,3 +10,7 @@
 
 /sw.js
   Cache-Control: no-cache
+
+/hen.html
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex
