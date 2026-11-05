@@ -9,6 +9,7 @@ create table if not exists public.hct_transactions (
   cat text not null,
   amount bigint not null check (amount > 0),
   wallet text not null default 'cash',
+  who text not null default 'me',
   draft boolean not null default false,
   recurring_id uuid,
   ts bigint,
@@ -23,6 +24,7 @@ create table if not exists public.hct_recurring (
   cat text not null,
   amount bigint not null,
   wallet text not null default 'ck',
+  who text not null default 'me',
   day int not null check (day between 1 and 31),
   last_month text,
   active boolean not null default true,
@@ -70,3 +72,7 @@ begin
     execute format('create policy "hct own rows" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- Nâng cấp từ bản cũ (chạy lại an toàn): thêm trường 'chi cho ai'
+alter table public.hct_transactions add column if not exists who text not null default 'me';
+alter table public.hct_recurring add column if not exists who text not null default 'me';

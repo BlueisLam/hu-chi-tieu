@@ -55,6 +55,10 @@ Mở link Netlify → **Đăng nhập** bằng email và mật khẩu vừa tạ
 | `grab 32k ck hôm qua` | 32.000đ · Di chuyển · hôm qua · chuyển khoản |
 | `gửi mẹ 2tr 3/11` | 2.000.000đ · Gia đình · ngày 3/11 |
 | `trà sữa 38` | 38.000đ (số không đơn vị được hiểu là nghìn) |
+| `cơm 45k cho Thái` | 45.000đ · Ăn uống · chi cho Thái |
+| `đi chợ 300k chung` | 300.000đ · Ăn uống · chung cả nhà |
+
+**Chi cho ai:** mỗi khoản được gắn nhãn Mình / Thái / Chung, nhưng vẫn tính đủ vào tổng chi. Tổng quan và Báo cáo có thanh tách theo người, hũ có thể lọc theo người. Đổi tên hoặc thêm người trong Cài đặt → Người trong nhà.
 
 Nếu app đoán sai danh mục, chọn lại một lần, lần sau app sẽ tự xếp đúng.
 
