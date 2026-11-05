@@ -361,7 +361,7 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.05-2';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.05-3';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -1134,8 +1134,8 @@ function viewSettings(){
         <label class="field">Ghi chú cho AI<input id="tn" value="${esc((S.settings.taste||{}).note||'')}" placeholder="vd hạn chế đồ chiên, ít ngọt"></label>
         <button class="primary" data-act="taste-save">Lưu khẩu vị</button></section>
       <section class="card"><div class="card-h"><h2>Bảo mật</h2></div>
-        <div class="set-row"><div class="t"><b>Khoá bằng Face ID</b><small>${canFace?'Hỏi Face ID mỗi khi mở app hoặc quay lại sau 1 phút':'Trình duyệt này không hỗ trợ'}</small></div>
-        <button class="switch" role="switch" aria-checked="${!!(face&&face.on)}" aria-label="Khoá bằng Face ID" data-act="face" ${canFace?'':'disabled'}></button></div></section>
+        <div class="set-row" style="flex-wrap:wrap"><div class="t"><b>Khoá bằng Face ID</b><small>${canFace?'Đăng nhập một lần là đủ. Bật khoá nếu muốn người khác cầm máy không xem được.':'Trình duyệt này không hỗ trợ'}</small></div>
+        <div class="seg seg-s" role="group" aria-label="Khi nào hỏi Face ID">${[['never','Tắt'],['1h','Sau 1 giờ'],['always','Mỗi lần mở']].map(([k,l])=>`<button data-face="${k}" aria-pressed="${faceWhen()===k}" ${canFace?'':'disabled'}>${l}</button>`).join('')}</div></div></section>
       <section class="card"><div class="card-h"><h2>Sao lưu</h2></div>
         <div class="set-row"><div class="t"><b>Phiên bản ${APP_VERSION}</b><small>${updAvail?'Có bản mới '+esc(updAvail)+', bấm để cập nhật':'Bấm nếu app không hiện tính năng mới'}</small></div><button class="btn-s" data-act="refresh">Tải bản mới</button></div>
         <div class="set-row"><div class="t"><b>Xuất file JSON</b><small>Toàn bộ giao dịch, kế hoạch và cài đặt</small></div><button class="btn-s" data-act="export">Xuất</button></div>
@@ -1641,8 +1641,11 @@ async function faceCheck(){
 }
 const gate=document.getElementById('gate');
 let hiddenAt=0, locked=false;
+function faceWhen(){ const f=store.get(LS.face,null); return f&&f.on&&f.id ? (f.when||'always') : 'never'; }
+const LOCK_AFTER = {always:60e3, '1h':3600e3};
 function showLock(){
-  const f=store.get(LS.face,null); if(!f||!f.on) return false;
+  const f=store.get(LS.face,null), w=faceWhen(); if(w==='never') return false;
+  if(w==='1h'){ const last=+store.get('hct_last',0); if(last && Date.now()-last<LOCK_AFTER['1h']) return false; }
   locked=true; gate.hidden=false;
   gate.innerHTML=`<div class="gate-card"><div class="jar">H</div><h2>Hũ Chi Tiêu</h2><p class="lbl">Mở khoá để xem sổ chi tiêu</p>
     <button class="primary" id="unlock">Mở khoá bằng Face ID</button><p class="err" id="lock-err" hidden></p>
@@ -1655,8 +1658,9 @@ function showLock(){
   return true;
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden){ hiddenAt=Date.now(); return; }
-  if(!locked && hiddenAt && Date.now()-hiddenAt>60000) showLock();
+  if(document.hidden){ hiddenAt=Date.now(); store.set('hct_last',hiddenAt); return; }
+  const w=faceWhen();
+  if(!locked && w!=='never' && hiddenAt && Date.now()-hiddenAt>LOCK_AFTER[w]) showLock();
   if(mode==='cloud'&&user) pull();
 });
 
@@ -1745,7 +1749,6 @@ async function onLogin(u, fresh){
   }
   store.set(LS.owner,u.id);
   render();
-  if(fresh && window.PublicKeyCredential && !store.get(LS.face,null)) setTimeout(()=>toast('Mẹo: bật Khoá bằng Face ID trong Cài đặt',3500),800);
   await pull();
   if(location.hash==='#nhap' && !locked) openAdd();
 }
@@ -1798,6 +1801,12 @@ document.addEventListener('click',async e=>{
   const ec=t.closest('[data-eatcui]'); if(ec){ eat.cui=ec.dataset.eatcui; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
   const rt=t.closest('[data-rate]'); if(rt){ openRate(rt.dataset.rate); return; }
   const rs=t.closest('[data-rateskip]'); if(rs){ const id=rs.dataset.rateskip; reviews()[id]={...(reviews()[id]||{}),skip:true}; saveSettings(); render(); return; }
+  const fw2=t.closest('[data-face]'); if(fw2){ const when=fw2.dataset.face, f=store.get(LS.face,null);
+    if(when==='never'){ if(f) store.set(LS.face,{...f,on:false}); toast('Đã tắt khoá Face ID'); render(); return; }
+    if(f&&f.id){ store.set(LS.face,{...f,on:true,when}); toast(when==='1h'?'Hỏi Face ID khi bỏ app quá 1 giờ':'Hỏi Face ID mỗi lần mở app'); render(); return; }
+    try{ await faceRegister(); store.set(LS.face,{...store.get(LS.face,{}),on:true,when}); toast('Đã bật khoá Face ID'); }
+    catch(err){ toast('Không bật được Face ID: '+(err.name==='NotAllowedError'?'bạn đã huỷ hoặc trình duyệt chặn':err.message),3800); }
+    render(); return; }
   const pw=t.closest('[data-potwho]'); if(pw){ potWho=pw.dataset.potwho; render(); return; }
   const cd=t.closest('[data-catdel]'); if(cd){
     if(!cd.classList.contains('armed')){ cd.classList.add('armed'); cd.textContent='?'; cd.style.background='var(--bad)'; cd.style.color='var(--surface)'; cd.setAttribute('aria-label','Bấm lần nữa để xoá'); return; }
@@ -1823,10 +1832,7 @@ document.addEventListener('click',async e=>{
       if(!url && !key && CONFIG.SUPABASE_URL){ store.del(LS.cfg); location.hash='#tong-quan'; location.reload(); return; }
       if(!/^https:\/\/.+/.test(url)||key.length<20){ toast('Kiểm tra lại URL và key',3000); return; }
       store.set(LS.cfg,{url,key}); location.hash='#tong-quan'; location.reload(); break; }
-    case 'face': { const on=A.getAttribute('aria-checked')==='true';
-      if(on){ store.del(LS.face); toast('Đã tắt khoá Face ID'); render(); return; }
-      try{ await faceRegister(); toast('Đã bật khoá Face ID'); }catch(err){ toast('Không bật được Face ID: '+(err.name==='NotAllowedError'?'bạn đã huỷ hoặc trình duyệt chặn':err.message),3800); }
-      render(); break; }
+    case 'face': break;
     case 'export': exportData(); break;
     case 'cat-add': { const list=document.getElementById('catlist'); const id='c'+Date.now().toString(36);
       list.insertAdjacentHTML('beforeend',catEditRow({id,name:'',icon:'🏷️',color:'lilac'})); list.lastElementChild.querySelector('.cn').focus(); break; }
@@ -1864,6 +1870,9 @@ if(/[?&](v|check)=/.test(location.search)) history.replaceState(null,'',location
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkUpdate(); });
 setTimeout(()=>checkUpdate(true),2500);
 
+/* một lần: bản cũ luôn hỏi Face ID; giờ mặc định tắt, ai muốn thì bật lại trong Cài đặt */
+try{ const f=store.get(LS.face,null); if(f && f.on && !f.when && !store.get('hct_face_mig',false)){ store.set(LS.face,{...f,on:false}); } store.set('hct_face_mig',true); }catch(e){}
+setInterval(()=>{ if(!document.hidden) store.set('hct_last',Date.now()); },60000);
 /* ============ khởi động ============ */
 const isRecovery = /type=recovery/.test(location.hash);
 if(/access_token=|error_description=/.test(location.hash)) window.__authHash = location.hash;

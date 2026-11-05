@@ -43,7 +43,7 @@ Mở link Cloudflare (`*.pages.dev`) → **Đăng nhập** bằng email và mậ
 ### 4. iPhone
 
 1. Mở link Cloudflare (`*.pages.dev`) bằng **Safari** → **Chia sẻ → Thêm vào MH chính**.
-2. Mở app từ icon → đăng nhập bằng email + mật khẩu → **Cài đặt → Khoá bằng Face ID**.
+2. Mở app từ icon → đăng nhập bằng email + mật khẩu (chỉ một lần, app nhớ đăng nhập). Muốn khoá thêm: **Cài đặt → Khoá bằng Face ID** → Tắt / Sau 1 giờ / Mỗi lần mở.
 3. Back Tap: app **Phím tắt** → tạo phím tắt **Mở URL** `https://<site>.pages.dev/#nhap` → **Cài đặt → Trợ năng → Cảm ứng → Chạm vào mặt sau → Chạm hai lần** → chọn phím tắt đó.
    Phím tắt sẽ mở Safari, nên cần đăng nhập trong Safari một lần nữa.
 
