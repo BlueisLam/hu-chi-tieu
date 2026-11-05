@@ -190,6 +190,24 @@ main{flex:1;min-width:0;padding-left:max(16px,env(safe-area-inset-left,0px));pad
 code{font-size:12.5px;background:var(--sunk);padding:1px 6px;border-radius:6px;word-break:break-all}
 textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);padding:10px;font-size:12px}
 
+/* hôm nay ăn gì */
+.eat-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.eat-list{display:grid;gap:10px;margin-top:6px}
+@media (min-width:700px){.eat-list{grid-template-columns:repeat(3,1fr)}}
+.eat-i{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;background:var(--sunk);border-radius:18px;padding:12px}
+@media (min-width:700px){.eat-i{grid-template-columns:44px 1fr;align-content:start}.eat-i .btn-s{grid-column:1/3;justify-self:start}}
+.eat-i.ghost{opacity:.6;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.eat-i.ghost{animation:none}}
+.eat-e{font-size:34px;line-height:1;text-align:center}
+.eat-t{min-width:0}
+.eat-t b{display:block;font-weight:600}
+.eat-t small{color:var(--muted);font-size:12.5px}
+.eat-t p{font-size:13px;margin-top:2px}
+.eat-tip{font-size:13.5px;background:var(--butter);border-radius:14px;padding:8px 12px}
+.eat-acts{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+.eat-acts .acts{display:flex;gap:8px}
+.btn-s:disabled{opacity:.5;cursor:default}
 /* chi cho ai */
 .whob{display:inline-block;vertical-align:2px;font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;margin-left:6px;color:var(--ink)}
 .whos{display:flex;gap:8px;flex-wrap:wrap}
@@ -643,6 +661,126 @@ function potWhoSeg(list){
   if(!opts.some(o=>o.id===potWho)) potWho='all';
   return `<div class="seg seg-s" role="group" aria-label="Xem hũ của ai">${opts.map(o=>`<button data-potwho="${o.id}" aria-pressed="${potWho===o.id}">${esc(o.name)}</button>`).join('')}</div>`;
 }
+/* ============ hôm nay ăn gì ============ */
+// [tên, emoji, giá/người, bữa phù hợp, nhãn]
+const DISHES = [
+  ['Phở bò','🍜',55000,'sang trua toi','nuoc'],['Bún bò Huế','🍜',50000,'sang trua toi','nuoc cay'],['Hủ tiếu Nam Vang','🍜',50000,'sang trua toi','nuoc'],
+  ['Bánh canh cua','🦀',55000,'sang trua','nuoc hai san'],['Bún riêu','🍜',40000,'sang trua','nuoc'],['Bún mắm','🍲',55000,'trua toi','nuoc hai san'],
+  ['Mì Quảng','🍜',45000,'sang trua','nuoc'],['Cháo lòng','🥣',35000,'sang toi','nuoc nhe'],['Cháo gà','🥣',35000,'sang toi','nuoc nhe'],
+  ['Bò kho bánh mì','🥘',45000,'sang','nuoc'],['Bánh mì thịt','🥖',25000,'sang vat','kho re'],['Xôi mặn','🍙',25000,'sang','kho re'],
+  ['Bánh cuốn','🥟',35000,'sang','nhe'],['Bánh bao','🥟',20000,'sang vat','re'],['Cơm tấm sườn','🍚',45000,'sang trua toi','com'],
+  ['Cơm gà xối mỡ','🍗',45000,'trua toi','com chien'],['Cơm văn phòng','🍱',40000,'trua','com re'],['Cơm chay','🥦',35000,'trua toi','com chay nhe re'],
+  ['Cơm rang dưa bò','🍳',45000,'trua toi','com chien'],['Bún thịt nướng','🥗',40000,'trua toi','kho'],['Bún đậu mắm tôm','🍢',55000,'trua toi','kho'],
+  ['Bánh xèo','🥞',50000,'toi','chien'],['Gỏi cuốn','🌯',30000,'trua vat','nhe re'],['Lẩu','🍲',150000,'toi','nuoc nhieu'],
+  ['Ốc','🐚',90000,'toi','hai san'],['Gà rán','🍗',70000,'trua toi','chien'],['Pizza','🍕',90000,'toi','chien'],['Sushi','🍣',120000,'toi','nhat'],
+  ['Cơm trộn Hàn Quốc','🍲',75000,'trua toi','han'],['Tokbokki','🌶️',50000,'vat toi','han cay'],['Salad ức gà','🥗',55000,'trua toi','nhe healthy'],
+  ['Hamburger','🍔',60000,'trua toi','chien'],['Bánh tráng trộn','🌶️',20000,'vat','re cay'],['Bắp xào','🌽',20000,'vat','re'],
+  ['Chè','🍧',25000,'vat','ngot'],['Sữa chua trái cây','🍨',25000,'vat','ngot nhe'],['Trà sữa','🧋',35000,'vat','uong ngot'],
+  ['Cà phê sữa đá','☕',25000,'sang vat','uong'],['Nước ép','🥤',35000,'vat','uong healthy'],
+  ['Tự nấu canh và trứng chiên','🍳',30000,'trua toi','tu-nau re'],['Tự nấu mì xào rau','🥬',25000,'toi','tu-nau re'],['Tự nấu cơm thịt kho','🍲',35000,'toi','tu-nau']
+];
+const MEAL_NAME = {sang:'Sáng',trua:'Trưa',vat:'Chiều',toi:'Tối'};
+const mealNow = () => { const h=new Date().getHours(); return h<10?'sang':h<14?'trua':h<17?'vat':'toi'; };
+let eat = {meal:mealNow(), people:1, reroll:0, loading:false};
+let aiAvail = null;
+const eatKey = () => 'hct_eat_'+todayKey()+'_'+eat.meal+'_'+eat.people;
+eat.reroll=(store.get(eatKey(),null)||{}).reroll||0;
+function seeded(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; }
+  return ()=>{ h=Math.imul(h^h>>>16,2246822507); h=Math.imul(h^h>>>13,3266489909); return ((h^=h>>>16)>>>0)/4294967296; }; }
+const tasteWords = t => norm(t||'').split(/[,;.\n]+|\s+va\s+/).map(x=>x.trim()).filter(x=>x.length>1);
+function recentFood(days){
+  const from=addDays(todayKey(),-days);
+  return live().filter(x=>x.cat==='an' && x.date>=from).sort((a,b)=>b.date.localeCompare(a.date)||(b.ts||0)-(a.ts||0));
+}
+function mealBudget(){
+  const share={sang:0.25,trua:0.4,toi:0.35,vat:0.15}[eat.meal], now=new Date();
+  const daysLeft=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate()+1;
+  const b=S.settings.budgets.an;
+  if(b){
+    const left=Math.max(0,b-monthSpent('an')), perDay=left/daysLeft;
+    const per=Math.max(20000,Math.round(perDay*share/eat.people/5000)*5000);
+    return {per, note:left>0?`Ngân sách ăn uống còn ${fmtShort(left)} cho ${daysLeft} ngày, khoảng ${fmtShort(perDay)}/ngày`:'Đã hết ngân sách ăn uống tháng này, ưu tiên món rẻ'};
+  }
+  const xs=recentFood(30).filter(x=>whoOf(x)==='me').map(x=>+x.amount).sort((a,b)=>a-b);
+  const med=xs.length?xs[Math.floor(xs.length/2)]:45000;
+  const per=Math.min(150000,Math.max(20000,Math.round(med*(eat.meal==='vat'?0.6:1)/5000)*5000));
+  return {per, note:'Chưa đặt ngân sách Ăn uống nên dùng giá trung bình các bữa gần đây'};
+}
+function localSuggest(per){
+  const T=S.settings.taste||{}, avoid=tasteWords(T.avoid), likes=tasteWords(T.likes);
+  const recent=recentFood(4).map(x=>norm(x.note)), rnd=seeded(eatKey()+'#'+eat.reroll);
+  const eatenRecently = n => recent.some(r=>r && (r.includes(n) || n.includes(r)));
+  const pool=DISHES.filter(d=>d[3].split(' ').includes(eat.meal)).map(([ten,emoji,gia,meals,tags])=>{
+    const n=norm(ten), hay=n+' '+tags;
+    if(avoid.some(a=>hay.includes(a))) return null;
+    let score=rnd()*1.2, why=[];
+    if(eatenRecently(n)) score-=3; else if(recent.length) why.push('Mấy hôm nay chưa ăn');
+    const diff=(gia-per)/per; score-=Math.max(0,diff)*2.5+Math.max(0,-diff-0.5);
+    if(gia<=per) why.push(gia<=per*0.75?'Rẻ hơn ngân sách':'Vừa ngân sách');
+    const lk=likes.find(l=>hay.includes(l)); if(lk){ score+=1.2; why.unshift('Hợp khẩu vị '+lk); }
+    return {ten,emoji,gia,cach:tags.includes('tu-nau')?'tự nấu':'quán',ly_do:why.slice(0,2).join(' · ')||'Đổi gió cho bữa '+MEAL_NAME[eat.meal].toLowerCase(),score,kind:tags.split(' ')[0]};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score);
+  const out=[], kinds=new Set();
+  for(const d of pool){ if(out.length>=3) break; if(kinds.has(d.kind) && pool.length>6) continue; kinds.add(d.kind); out.push(d); }
+  for(const d of pool){ if(out.length>=3) break; if(!out.includes(d)) out.push(d); }
+  return out;
+}
+function eatTip(){
+  const r=recentFood(7), cnt={}; r.forEach(x=>{ const k=norm(x.note); cnt[k]=(cnt[k]||0)+1; });
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  if(top && top[1]>=3){ const x=r.find(y=>norm(y.note)===top[0]); return `7 ngày qua bạn ăn ${x.note.toLowerCase()} ${top[1]} lần rồi, thử đổi vị nhé.`; }
+  if(!r.length) return 'Ghi vài bữa ăn để gợi ý hiểu khẩu vị của bạn hơn.';
+  return '';
+}
+function eatCard(){
+  const B=mealBudget(), cached=store.get(eatKey(),null);
+  const ai=cached && cached.reroll===eat.reroll ? cached : null;
+  const items=ai?ai.items:localSuggest(B.per), tip=ai?ai.tip:eatTip();
+  const p0=people()[0];
+  const canAI = mode==='cloud' && aiAvail!==false;
+  return `<section class="card eat" aria-label="Hôm nay ăn gì">
+    <div class="card-h"><h2>Hôm nay ăn gì?</h2>
+      <div class="seg seg-s" role="group" aria-label="Bữa">${Object.entries(MEAL_NAME).map(([k,l])=>`<button data-eatmeal="${k}" aria-pressed="${eat.meal===k}">${l}</button>`).join('')}</div></div>
+    <div class="eat-ctl">${p0?`<div class="seg seg-s" role="group" aria-label="Ăn cho ai"><button data-eatppl="1" aria-pressed="${eat.people===1}">Mình</button><button data-eatppl="2" aria-pressed="${eat.people===2}">Mình + ${esc(p0.name)}</button></div>`:''}
+      <span class="lbl">Khoảng <b class="num">${fmtShort(B.per)}</b>/người · ${esc(B.note)}</span></div>
+    <div class="eat-list">${eat.loading?[0,1,2].map(()=>'<div class="eat-i ghost"><span class="eat-e">🍽️</span><div><b>Đang nghĩ món…</b><small>&nbsp;</small></div></div>').join(''):
+      items.map((d,i)=>`<div class="eat-i"><span class="eat-e">${esc(d.emoji)}</span><div class="eat-t"><b>${esc(d.ten)}</b>
+        <small class="num">${fmtShort(d.gia)}${eat.people>1?'/người':''} · ${esc(d.cach)}</small><p>${esc(d.ly_do||'')}</p></div>
+        <button class="btn-s" data-eatpick="${i}">Ăn món này</button></div>`).join('')}</div>
+    ${tip&&!eat.loading?`<p class="eat-tip">💡 ${esc(tip)}</p>`:''}
+    <div class="eat-acts">
+      <span class="lbl">${ai?'AI gợi ý'+(ai.provider?' · '+esc(ai.provider==='gemini'?'Gemini':'Groq'):''):'Gợi ý nhanh trên máy'}</span>
+      <div class="acts"><button class="btn-s ghost" data-eat="reroll" ${eat.loading?'disabled':''}>Đổi món khác</button>
+      ${canAI?`<button class="btn-s" data-eat="ai" ${eat.loading?'disabled':''}>✨ ${ai?'Hỏi lại AI':'Hỏi AI'}</button>`:''}</div></div>
+  </section>`;
+}
+function eatItems(){ const c=store.get(eatKey(),null); return c && c.reroll===eat.reroll ? c.items : localSuggest(mealBudget().per); }
+async function askAI(){
+  if(eat.loading) return;
+  if(mode!=='cloud'||!sb){ toast('Cần đăng nhập để dùng AI'); return; }
+  const shown=eatItems().map(x=>x.ten), prev=store.get(eatKey(),null);
+  const exclude=[...new Set([...(prev&&prev.seen||[]),...shown])].slice(-15);
+  eat.loading=true; render();
+  try{
+    const session=(await sb.auth.getSession()).data.session;
+    if(!session) throw new Error('Phiên đăng nhập đã hết, hãy đăng nhập lại.');
+    const T=S.settings.taste||{}, B=mealBudget();
+    const r=await fetch('/api/goi-y',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},
+      body:JSON.stringify({meal:eat.meal,people:eat.people,perMeal:B.per,today:['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][new Date().getDay()]+', '+fmtD(todayKey()),
+        recent:recentFood(10).map(x=>dayLabel(x.date)+': '+x.note+' '+fmtShort(x.amount)).slice(0,25),exclude,likes:T.likes||'',avoid:T.avoid||'',note:T.note||''})});
+    let d={}; try{ d=await r.json(); }catch(e){}
+    if(!r.ok){ if(d.code==='no_key') aiAvail=false; throw new Error(d.error||('Lỗi '+r.status)); }
+    eat.reroll++;
+    store.set(eatKey(),{items:d.items,tip:d.tip,provider:d.provider,reroll:eat.reroll,seen:[...exclude,...d.items.map(x=>x.ten)].slice(-15)});
+  }catch(e){ toast(e.message||'AI chưa trả lời được, thử lại sau',3500); }
+  eat.loading=false; render();
+}
+async function checkAI(){
+  if(!/^https:/.test(location.protocol) || /claude\.(ai|site)|claudeusercontent/.test(location.hostname)){ aiAvail=false; return; }
+  try{ const r=await fetch('/api/goi-y',{cache:'no-store'}); const d=await r.json(); aiAvail=!!d.ai; }catch(e){ aiAvail=false; }
+  if(['tong-quan','cai-dat'].includes(current())) render();
+}
+
 /* ============ màn Tổng quan ============ */
 function viewHome(){
   const t=todayKey(), mk=monthOf(t), now=new Date(), dom=now.getDate();
@@ -674,6 +812,7 @@ function viewHome(){
     ${potCard('home-'+mk+'-'+potWho, potWho==='all'?month:month.filter(x=>whoOf(x)===potWho), {level:T?total/T:0.2, state:budgetState(total,T), aria:'Hũ chi tiêu tháng '+(now.getMonth()+1)})}
     <p class="lbl">${T?`Mực canh là ngân sách đã dùng: ${Math.round(total/T*100)}%. `:'Đặt tổng ngân sách để mực canh cho biết đã tiêu bao nhiêu. '}Món càng to là khoản càng nhiều tiền, chạm vào món để xem.</p>
   </section>
+  ${eatCard()}
   <div class="grid2">
     <section class="hero" aria-label="Tổng chi tháng này">
       <div class="lbl">Đã chi tháng ${now.getMonth()+1} · ngày ${dom}/${daysIn}</div>
@@ -848,6 +987,12 @@ function viewSettings(){
   <div class="grid2">
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       <section class="card"><div class="card-h"><h2>Kết nối cloud</h2></div>${cloud}</section>
+      <section class="card"><div class="card-h"><h2>Khẩu vị</h2><span class="lbl">${aiAvail?'AI gợi ý món: đang bật':aiAvail===false&&mode==='cloud'?'AI gợi ý món: chưa gắn key':''}</span></div>
+        <p class="lbl">Dùng cho thẻ “Hôm nay ăn gì?”. Ngăn cách bằng dấu phẩy.</p>
+        <label class="field">Thích ăn<input id="tl" value="${esc((S.settings.taste||{}).likes||'')}" placeholder="vd bún, đồ Hàn, cay"></label>
+        <label class="field">Không ăn được<input id="ta" value="${esc((S.settings.taste||{}).avoid||'')}" placeholder="vd hành, hải sản, nội tạng"></label>
+        <label class="field">Ghi chú cho AI<input id="tn" value="${esc((S.settings.taste||{}).note||'')}" placeholder="vd hạn chế đồ chiên, ít ngọt"></label>
+        <button class="primary" data-act="taste-save">Lưu khẩu vị</button></section>
       <section class="card"><div class="card-h"><h2>Bảo mật</h2></div>
         <div class="set-row"><div class="t"><b>Khoá bằng Face ID</b><small>${canFace?'Hỏi Face ID mỗi khi mở app hoặc quay lại sau 1 phút':'Trình duyệt này không hỗ trợ'}</small></div>
         <button class="switch" role="switch" aria-checked="${!!(face&&face.on)}" aria-label="Khoá bằng Face ID" data-act="face" ${canFace?'':'disabled'}></button></div></section>
@@ -1114,7 +1259,7 @@ function armDelete(btn,fn){ btn.onclick=()=>{ if(!btn.classList.contains('armed'
 
 /* --- ghi khoản chi --- */
 let draft=null, manualCat=null, manualWho=null;
-function openAdd(){
+function openAdd(prefill, cat){
   if(!document.getElementById('gate').hidden) return;
   manualCat=null; manualWho=null; draft=parse('');
   const hints=['cafe 45k','grab 32k ck',`cơm 45k cho ${(people()[0]||{name:'Thái'}).name}`,'đi chợ 300k chung','tiền điện 412k ck'];
@@ -1135,6 +1280,7 @@ function openAdd(){
   document.getElementById('d').onchange=e=>{ draft.date=e.target.value||todayKey(); draft._d=1; paintDraft(); };
   document.getElementById('w').onchange=e=>{ draft.wallet=e.target.value; draft._w=1; paintDraft(); };
   document.getElementById('save').onclick=commit;
+  if(typeof prefill==='string' && prefill){ say.value=prefill; if(cat) manualCat=cat; updateDraft(prefill); }
   paintDraft(); setTimeout(()=>say.focus(),60);
 }
 function updateDraft(v){
@@ -1464,6 +1610,15 @@ document.addEventListener('click',async e=>{
   const wh=t.closest('[data-who]'); if(wh){ manualWho=wh.dataset.who; draft.who=manualWho; paintDraft(); return; }
   const fw=t.closest('[data-fw]'); if(fw){ filterWho=fw.dataset.fw; render(); return; }
   const wj=t.closest('[data-whojump]'); if(wj){ filterWho=wj.dataset.whojump; filterCat='all'; listMonth=current()==='tong-quan'?monthOf(todayKey()):'all'; location.hash='#giao-dich'; return; }
+  const em=t.closest('[data-eatmeal]'); if(em){ eat.meal=em.dataset.eatmeal; eat.reroll=(store.get('hct_eat_'+todayKey()+'_'+eat.meal+'_'+eat.people,null)||{}).reroll||0; render(); return; }
+  const ep=t.closest('[data-eatppl]'); if(ep){ eat.people=+ep.dataset.eatppl; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
+  const ea=t.closest('[data-eat]'); if(ea){
+    if(ea.dataset.eat==='ai'){ askAI(); return; }
+    const c=store.get(eatKey(),null); if(c && c.reroll===eat.reroll && aiAvail && mode==='cloud'){ askAI(); return; }
+    eat.reroll++; render(); return; }
+  const pick=t.closest('[data-eatpick]'); if(pick){ const d=eatItems()[+pick.dataset.eatpick]; if(d){
+    const total=d.gia*eat.people, amt=total%1000===0?(total/1000)+'k':String(total);
+    openAdd(`${d.ten} ${amt}${eat.people>1?' chung':''}`,'an'); } return; }
   const pw=t.closest('[data-potwho]'); if(pw){ potWho=pw.dataset.potwho; render(); return; }
   const cd=t.closest('[data-catdel]'); if(cd){
     if(!cd.classList.contains('armed')){ cd.classList.add('armed'); cd.textContent='?'; cd.style.background='var(--bad)'; cd.style.color='var(--surface)'; cd.setAttribute('aria-label','Bấm lần nữa để xoá'); return; }
@@ -1498,6 +1653,7 @@ document.addEventListener('click',async e=>{
       list.insertAdjacentHTML('beforeend',catEditRow({id,name:'',icon:'🏷️',color:'lilac'})); list.lastElementChild.querySelector('.cn').focus(); break; }
     case 'ppl-add': { const list=document.getElementById('pplist'); list.insertAdjacentHTML('beforeend',pplRow({id:'p'+Date.now().toString(36),name:'',icon:'🙂',color:'mint'})); list.lastElementChild.querySelector('.cn').focus(); break; }
     case 'ppl-save': S.settings.people=readPeople(); saveSettings(); toast('Đã lưu'); render(); break;
+    case 'taste-save': S.settings.taste={likes:val('tl').trim(),avoid:val('ta').trim(),note:val('tn').trim()}; saveSettings(); toast('Đã lưu khẩu vị'); render(); break;
     case 'cat-save': S.settings.cats=readCatEdits(); if(!S.settings.cats.some(c=>c.id==='khac')) S.settings.cats.push({...DEFAULT_CATS[8]}); saveSettings(); toast('Đã lưu danh mục'); render(); break;
   }
 });
@@ -1528,6 +1684,7 @@ async function boot(){
     showLogin(); return;
   }
   showLock();
+  checkAI();
   await onLogin(session.user,false);
 }
 if('serviceWorker' in navigator && location.protocol==='https:' && !/claude\.(ai|site)|claudeusercontent/.test(location.hostname)){

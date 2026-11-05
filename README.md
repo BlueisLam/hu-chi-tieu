@@ -62,6 +62,20 @@ Mở link Cloudflare (`*.pages.dev`) → **Đăng nhập** bằng email và mậ
 
 Nếu app đoán sai danh mục, chọn lại một lần, lần sau app sẽ tự xếp đúng.
 
+## Gợi ý "Hôm nay ăn gì?" bằng AI
+
+Thẻ ở Tổng quan luôn có 3 gợi ý nhanh chạy ngay trên máy (theo bữa, ngân sách Ăn uống còn lại, món đã ăn 4 ngày gần đây và khẩu vị trong Cài đặt). Bấm **✨ Hỏi AI** để được gợi ý kỹ hơn.
+
+API key chỉ nằm trên máy chủ Cloudflare (`functions/api/goi-y.js`), không nằm trong code và trình duyệt không thấy. Chỉ người đã đăng nhập mới gọi được.
+
+**Gắn key:** Cloudflare → Workers & Pages → `hu-chi-tieu` → Settings → Variables and Secrets → Add:
+- `GEMINI_API_KEY` (loại **Secret**): lấy miễn phí ở https://aistudio.google.com/apikey
+- Không bắt buộc: `GROQ_API_KEY` làm dự phòng; `GEMINI_MODEL` / `GROQ_MODEL` khi model cũ bị khai tử; thêm `GEMINI_API_KEY_2`… để chia tải.
+
+Sau khi thêm biến: Deployments → bản mới nhất → **Retry deployment** thì key mới có hiệu lực.
+
+Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.mjs`
+
 ## Phát triển tiếp
 
 - Sửa `index.html` → commit → push → Cloudflare tự deploy.
