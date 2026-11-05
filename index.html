@@ -65,7 +65,15 @@ main{flex:1;min-width:0;padding-left:max(16px,env(safe-area-inset-left,0px));pad
 .brand h1{font-size:22px;white-space:nowrap}
 .brand small{display:block;color:var(--muted);font-size:12px;font-family:var(--f-body)}
 .top-r{display:flex;align-items:center;gap:8px}
-.gear{width:40px;height:40px;border-radius:14px;background:var(--surface);display:grid;place-items:center;color:var(--muted)}
+.gear{width:40px;height:40px;border-radius:14px;background:var(--surface);display:grid;place-items:center;color:var(--muted);flex:none}
+.gear[data-act="refresh"]:active svg{transform:rotate(200deg);transition:transform .3s}
+@media (max-width:430px){.top .sync span:last-child{display:none}.top .sync{padding:9px}.top-r{gap:6px}.brand h1{font-size:20px}}
+.upd{position:fixed;z-index:65;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(74px + env(safe-area-inset-top,0px));
+  max-width:520px;margin:0 auto;display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);border-radius:18px;padding:10px 10px 10px 16px;box-shadow:var(--shadow);font-size:14px}
+.upd span{flex:1;min-width:0}
+@media (min-width:900px){.upd{top:calc(16px + env(safe-area-inset-top,0px))}}
+.upd .btn-s{background:var(--accent);color:var(--accent-ink)}
+.upd-x{width:30px;height:30px;border-radius:10px;color:var(--bg);opacity:.7}
 .gear svg{width:22px;height:22px}
 .sync{font-size:12px;padding:5px 10px;border-radius:99px;background:var(--surface);color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
@@ -347,11 +355,13 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 <div class="scrim" id="scrim" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" id="sheet"></div></div>
 <div class="gate" id="gate" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="upd" id="upd" role="status" hidden><span>✨ Có bản mới của app</span><button class="btn-s" data-act="refresh">Cập nhật</button><button class="upd-x" data-act="upd-later" aria-label="Để sau">✕</button></div>
 
 <script>
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
+const APP_VERSION = '2026.11.05-2';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -663,8 +673,9 @@ function grouped(list){
   return Object.keys(by).sort().reverse().map(k=>`<div class="day"><span>${dayLabel(k)}</span><span class="num">−${fmt(sum(by[k].filter(x=>!x.draft)))}đ</span></div>`+by[k].sort((a,b)=>(b.ts||0)-(a.ts||0)).map(txRow).join('')).join('');
 }
 const gearIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>`;
+const refreshIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`;
 const mobileTop = sub => `<div class="top"><div class="brand"><div class="jar">H</div><h1>Hũ Chi Tiêu<small>${sub}</small></h1></div>
-  <div class="top-r"><span class="sync" data-sync><i></i><span>…</span></span><a class="gear" href="#cai-dat" aria-label="Cài đặt">${gearIcon}</a></div></div>`;
+  <div class="top-r"><span class="sync" data-sync><i></i><span>…</span></span><button class="gear" data-act="refresh" aria-label="Tải bản mới nhất" title="Tải bản mới nhất">${refreshIcon}</button><a class="gear" href="#cai-dat" aria-label="Cài đặt">${gearIcon}</a></div></div>`;
 const demoBanner = () => hasSample()?`<div class="demo"><span>Đang hiển thị <b>dữ liệu mẫu</b> để bạn xem thử.</span><button data-act="clear-sample">Xoá dữ liệu mẫu</button></div>`:'';
 function catRows(entries,total,prevMap){
   const max=entries.length?entries[0][1]:1;
@@ -1126,6 +1137,7 @@ function viewSettings(){
         <div class="set-row"><div class="t"><b>Khoá bằng Face ID</b><small>${canFace?'Hỏi Face ID mỗi khi mở app hoặc quay lại sau 1 phút':'Trình duyệt này không hỗ trợ'}</small></div>
         <button class="switch" role="switch" aria-checked="${!!(face&&face.on)}" aria-label="Khoá bằng Face ID" data-act="face" ${canFace?'':'disabled'}></button></div></section>
       <section class="card"><div class="card-h"><h2>Sao lưu</h2></div>
+        <div class="set-row"><div class="t"><b>Phiên bản ${APP_VERSION}</b><small>${updAvail?'Có bản mới '+esc(updAvail)+', bấm để cập nhật':'Bấm nếu app không hiện tính năng mới'}</small></div><button class="btn-s" data-act="refresh">Tải bản mới</button></div>
         <div class="set-row"><div class="t"><b>Xuất file JSON</b><small>Toàn bộ giao dịch, kế hoạch và cài đặt</small></div><button class="btn-s" data-act="export">Xuất</button></div>
         <div class="set-row"><div class="t"><b>Nhập từ file</b><small>Gộp vào dữ liệu hiện có</small></div><label class="btn-s" style="cursor:pointer">Chọn file<input type="file" id="imp" accept="application/json,.json" hidden></label></div>
         ${hasSample()?'<div class="set-row"><div class="t"><b>Dữ liệu mẫu</b><small>Xoá để bắt đầu ghi thật</small></div><button class="btn-s ghost" data-act="clear-sample">Xoá</button></div>':''}
@@ -1820,10 +1832,37 @@ document.addEventListener('click',async e=>{
       list.insertAdjacentHTML('beforeend',catEditRow({id,name:'',icon:'🏷️',color:'lilac'})); list.lastElementChild.querySelector('.cn').focus(); break; }
     case 'ppl-add': { const list=document.getElementById('pplist'); list.insertAdjacentHTML('beforeend',pplRow({id:'p'+Date.now().toString(36),name:'',icon:'🙂',color:'mint'})); list.lastElementChild.querySelector('.cn').focus(); break; }
     case 'ppl-save': S.settings.people=readPeople(); saveSettings(); toast('Đã lưu'); render(); break;
+    case 'refresh': hardRefresh(); break;
+    case 'upd-later': document.getElementById('upd').hidden=true; break;
     case 'taste-save': S.settings.taste={likes:val('tl').trim(),avoid:val('ta').trim(),note:val('tn').trim()}; saveSettings(); toast('Đã lưu khẩu vị'); render(); break;
     case 'cat-save': S.settings.cats=readCatEdits(); if(!S.settings.cats.some(c=>c.id==='khac')) S.settings.cats.push({...DEFAULT_CATS[8]}); saveSettings(); toast('Đã lưu danh mục'); render(); break;
   }
 });
+
+
+/* ============ cập nhật phiên bản ============ */
+let updAvail='', updChecked=0;
+const inPreview = () => !/^https?:/.test(location.protocol) || /claude\.(ai|site)|claudeusercontent/.test(location.hostname);
+async function checkUpdate(force){
+  if(inPreview() || !navigator.onLine) return;
+  if(!force && Date.now()-updChecked<60000) return;
+  updChecked=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?check='+Date.now(),{cache:'no-store'});
+    const m=(await r.text()).match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1]!==APP_VERSION){ updAvail=m[1]; const b=document.getElementById('upd'); if(b) b.hidden=false; }
+  }catch(e){}
+}
+async function hardRefresh(){
+  toast('Đang tải bản mới…',8000);
+  try{ if(mode==='cloud' && Q.length) await Promise.race([flush(), new Promise(r=>setTimeout(r,4000))]); }catch(e){}   // đẩy dữ liệu chưa đồng bộ trước
+  try{ if(navigator.serviceWorker){ const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.update().catch(()=>{}))); } }catch(e){}
+  try{ if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); } }catch(e){}
+  location.replace(location.pathname+'?v='+Date.now()+(location.hash||'#tong-quan'));
+}
+if(/[?&](v|check)=/.test(location.search)) history.replaceState(null,'',location.pathname+location.hash);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkUpdate(); });
+setTimeout(()=>checkUpdate(true),2500);
 
 /* ============ khởi động ============ */
 const isRecovery = /type=recovery/.test(location.hash);

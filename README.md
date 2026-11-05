@@ -85,5 +85,6 @@ Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.m
 ## Phát triển tiếp
 
 - Sửa `index.html` → commit → push → Cloudflare tự deploy.
-- Khi đổi `sw.js`, tăng `CACHE = 'hct-vN'` để máy người dùng nhận bản mới.
+- **Mỗi lần sửa, tăng `APP_VERSION`** ở đầu phần script của `index.html` (vd `2026.11.05-3`). App trên điện thoại tự so phiên bản khi mở lại và hiện thanh “Có bản mới”. Nút ↻ trên thanh đầu trang (bản điện thoại) và Cài đặt → Tải bản mới sẽ xoá bộ nhớ đệm rồi tải lại.
+- Khi đổi `sw.js`, tăng `CACHE = 'hct-vN'`.
 - Ý tưởng: đọc biến động số dư qua Casso/SePay (webhook → Supabase Edge Function), quản lý thu nhập, chia tiền nhóm.
