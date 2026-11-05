@@ -17,6 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <style>
 /* Layout: phone-first single column with a fixed tab bar; ≥900px becomes sidebar + content */
 :root{
@@ -189,6 +190,19 @@ main{flex:1;min-width:0;padding-left:max(16px,env(safe-area-inset-left,0px));pad
 code{font-size:12.5px;background:var(--sunk);padding:1px 6px;border-radius:6px;word-break:break-all}
 textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);padding:10px;font-size:12px}
 
+/* hũ */
+.pot{position:relative;border-radius:22px;transform-origin:50% 90%;width:100%;max-width:600px;margin:0 auto}
+.pot canvas{display:block;width:100%;cursor:pointer;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+.pot.shake{animation:jig .5s ease-out}
+@keyframes jig{0%,100%{transform:none}15%{transform:rotate(-2.2deg)}35%{transform:rotate(2deg)}55%{transform:rotate(-1.3deg)}75%{transform:rotate(.8deg)}}
+.pot-hint{position:absolute;top:10px;right:16px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--bg);color:var(--muted);pointer-events:none}
+.pot-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:14px;pointer-events:none;padding:0 24px}
+.fav{display:flex;align-items:center;gap:12px;background:var(--sunk);border-radius:16px;padding:10px 14px}
+.fav-e{font-size:30px;line-height:1}
+.fav b{font-weight:600}
+.fav small{display:block}
+.fav-n{color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion:reduce){.pot.shake{animation:none}}
 /* tab bar */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);align-items:end;padding:8px max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
 .tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);text-decoration:none;padding:4px 0}
@@ -612,6 +626,10 @@ function viewHome(){
   return `${mobileTop('Tháng '+(now.getMonth()+1)+'/'+now.getFullYear())}
   ${demoBanner()}
   <button class="quick" data-open-add><span class="plus">＋</span><span>Gõ nhanh, ví dụ “cafe 45k” hoặc “grab 32k ck hôm qua”</span></button>
+  <section class="card pot-card"><div class="card-h"><h2>Hũ tháng ${now.getMonth()+1}</h2><span class="lbl">${month.length} khoản</span></div>
+    ${potCard('home-'+mk, month, {level:T?total/T:0.2, state:budgetState(total,T), aria:'Hũ chi tiêu tháng '+(now.getMonth()+1)})}
+    <p class="lbl">${T?`Mực canh là ngân sách đã dùng: ${Math.round(total/T*100)}%. `:'Đặt tổng ngân sách để mực canh cho biết đã tiêu bao nhiêu. '}Món càng to là khoản càng nhiều tiền, chạm vào món để xem.</p>
+  </section>
   <div class="grid2">
     <section class="hero" aria-label="Tổng chi tháng này">
       <div class="lbl">Đã chi tháng ${now.getMonth()+1} · ngày ${dom}/${daysIn}</div>
@@ -698,17 +716,22 @@ function viewReport(){
   const days=P.start>t?0:dayDiff(P.start,curEnd)+1;
   const cm=byCat(cur), pm=byCat(prev), entries=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
   const top=[...cur].sort((a,b)=>b.amount-a.amount).slice(0,5);
+  const T=S.settings.total, budgetP = T ? (rp.mode==='week'?T*7/new Date(+P.start.slice(0,4),+P.start.slice(5,7),0).getDate():rp.mode==='year'?T*12:T) : 0;
+  const rLevel = budgetP ? {level:total/budgetP, state:budgetState(total,budgetP)} : {level:0.2, state:''};
+  const fav=topItem(cur);
   let d=''; if(pt>0){ const p=Math.round((total-pt)/pt*100); d=`<span class="chg ${p>0?'up':p<0?'down':''}" style="margin:0">${p>0?'+':''}${p}%</span>`; }
   return `${mobileTop('Báo cáo')}
   <div class="page-h"><h2>Báo cáo</h2>
     <div class="seg" role="group" aria-label="Kỳ báo cáo">${[['week','Tuần'],['month','Tháng'],['year','Năm']].map(([k,l])=>`<button data-rm="${k}" aria-pressed="${rp.mode===k}">${l}</button>`).join('')}</div></div>
   <section class="card" style="gap:12px">
     <div class="navp"><button data-roff="-1" aria-label="Kỳ trước">‹</button><b>${P.title}</b><button data-roff="1" aria-label="Kỳ sau" ${rp.off>=0?'disabled':''}>›</button></div>
+    ${potCard('r-'+P.start+'-'+rp.mode, cur, {level:rLevel.level, state:rLevel.state, aria:'Hũ chi tiêu '+P.title})}
     <div class="stats">
       <div class="mini"><small>Tổng chi</small><b class="num">${fmtShort(total)}</b></div>
       <div class="mini"><small>TB / ngày</small><b class="num">${fmtShort(days?total/days:0)}</b></div>
       <div class="mini"><small>So kỳ trước</small><b>${d||'—'}</b></div>
     </div>
+    ${fav?`<div class="fav"><span class="fav-e">${itemEmoji(fav.x)}</span><div><small class="lbl">Hay mua nhất</small><b>${esc(fav.x.note||catById(fav.x.cat).name)}</b> <span class="fav-n">· ${fav.n} lần</span></div></div>`:''}
     ${total?barChart(vals,P.buckets.map(b=>b.label),hi,'Chi tiêu '+P.title):'<div class="empty">Kỳ này chưa có khoản chi nào.</div>'}
     ${hi>=0?`<p class="lbl">Chi nhiều nhất: ${rp.mode==='year'?'tháng '+(hi+1):rp.mode==='week'?P.buckets[hi].label+' ('+fmtD(P.buckets[hi].from)+')':'ngày '+(hi+1)} · ${fmt(vals[hi])}đ${rp.off===0&&pt>0?' · so sánh với cùng số ngày của kỳ trước':''}</p>`:''}
   </section>
@@ -796,12 +819,207 @@ function catEditRow(c){
     <div class="sw">${COLOR_KEYS.map(k=>`<button style="background:var(--${k})" data-sw="${k}" aria-pressed="${c.color===k}" aria-label="Màu ${k}"></button>`).join('')}</div></div>`;
 }
 
+/* ============ hũ canh: mỗi khoản chi là một món rơi vào hũ ============ */
+const ITEM_EMOJI = [
+  ['tra sua|milk tea|boba|gong cha|tocotoco|koi','🧋'],['cafe|ca phe|cf|highland|highlands|phuc long|starbucks|katinat|cong ca','☕'],
+  ['sinh to|nuoc ep|nuoc mia|smoothie','🥤'],['coca|pepsi|nuoc ngot|sting|7up|redbull','🥤'],['tra','🍵'],['bia|beer|ruou|bar|pub','🍺'],
+  ['kem chong nang|my pham|son|skincare|serum|sua rua mat','💄'],['kem|ice cream','🍦'],
+  ['banh mi','🥖'],['banh chung|banh tet','🫔'],['banh trang|an vat|snack|bap rang','🍿'],['banh|cake|tiramisu','🍰'],
+  ['pho|bun|hu tieu|mi|mien|chao|banh canh','🍜'],['lau|hotpot','🍲'],['com|com tam|com trua','🍚'],['xoi','🍙'],
+  ['ga|ga ran|kfc|jollibee','🍗'],['pizza','🍕'],['burger|mcdonald','🍔'],['sushi|sashimi','🍣'],['nuong|bbq|thit','🍖'],['oc|hai san|tom|cua','🦐'],
+  ['trai cay|hoa qua|xoai|tao|cam|nho','🍎'],
+  ['grab|grabbike|be|xanh sm|taxi|xe om|gojek','🛵'],['xang|do xang','⛽'],['gui xe','🅿️'],['ve may bay|may bay','✈️'],
+  ['xe buyt|bus|metro','🚌'],['ve tau','🚆'],['sua xe|rua xe','🔧'],
+  ['tien dien|dien','💡'],['tien nuoc','💧'],['internet|wifi|4g|cuoc dien thoai','📶'],['tien nha|thue nha|tien phong|phi quan ly','🏠'],
+  ['shopee|lazada|tiki|tiktok shop|don hang','📦'],['ao|quan|vay|ao khoac','👕'],['giay|dep','👟'],['tui|balo','👜'],
+  ['sieu thi|bach hoa xanh|bach hoa|winmart|tap hoa|cho','🛒'],
+  ['netflix|phim|cgv|lotte|youtube premium','🎬'],['spotify|nhac','🎧'],['game|steam','🎮'],['karaoke','🎤'],
+  ['concert|fanmeeting|ve','🎫'],['du lich|khach san|homestay','🧳'],['bida','🎱'],
+  ['thuoc|nha thuoc|vitamin','💊'],['gym|yoga|boi','🏋️'],['kham|bac si|benh vien|nha khoa','🩺'],
+  ['sach','📚'],['hoc phi|khoa hoc|hoc|ielts|toeic|udemy|coursera','🎓'],
+  ['gui me|cho me|gui ba|cho ba|bieu|li xi','🧧'],['qua|sinh nhat','🎁'],['dam cuoi|mung cuoi|hieu hi','💒']
+].map(([k,e])=>[new RegExp('(^|\\s)('+k+')(\\s|$)'),e]);
+function itemEmoji(x){ const n=' '+norm(x.note)+' '; for(const [re,e] of ITEM_EMOJI) if(re.test(n)) return e; return catById(x.cat).icon; }
+
+const POT_DATA={}, potMem={};
+let pots=[], motionOn=false, motionAsked=false, lastShake=0;
+function potCard(key, items, o){
+  const shown=[...items].sort((a,b)=>b.amount-a.amount).slice(0,90);
+  POT_DATA[key]={items:shown, level:o.level, state:o.state||''};
+  const more=items.length-shown.length;
+  return `<div class="pot" data-pot="${esc(key)}"><canvas role="img" aria-label="${esc(o.aria||'Hũ chi tiêu')}"></canvas>
+    ${items.length?'<span class="pot-hint">Chạm để lắc</span>':'<div class="pot-empty">Hũ đang trống.<br>Bấm ＋ để thả khoản đầu tiên vào.</div>'}</div>
+    ${more>0?`<p class="lbl">Hiển thị ${shown.length} khoản lớn nhất, còn ${more} khoản nhỏ.</p>`:''}`;
+}
+function topItem(list){
+  const c={}; list.forEach(x=>{ const k=norm(x.note)||x.cat; (c[k]=c[k]||{n:0,x}).n++; });
+  const best=Object.values(c).sort((a,b)=>b.n-a.n)[0];
+  return best && best.n>1 ? best : null;
+}
+function enableMotion(){
+  if(motionOn||motionAsked) return; motionAsked=true;
+  const D=window.DeviceMotionEvent; if(!D) return;
+  const go=()=>{ motionOn=true; window.addEventListener('devicemotion',e=>{
+    const a=e.accelerationIncludingGravity||e.acceleration; if(!a) return;
+    const m=Math.abs(a.x||0)+Math.abs(a.y||0)+Math.abs(a.z||0);
+    if(m>30 && Date.now()-lastShake>650){ lastShake=Date.now(); pots.forEach(p=>p.shake(1.3)); }
+  }); };
+  try{ if(typeof D.requestPermission==='function') D.requestPermission().then(s=>{ if(s==='granted') go(); }).catch(()=>{}); else go(); }catch(e){}
+}
+function destroyPots(){ pots.forEach(p=>p.destroy()); pots=[]; }
+function mountPots(){
+  destroyPots();
+  document.querySelectorAll('[data-pot]').forEach(el=>{ const d=POT_DATA[el.dataset.pot]; if(d) pots.push(makePot(el,d)); });
+}
+function makePot(wrap, data){
+  const cv=wrap.querySelector('canvas'), ctx=cv.getContext('2d'), M=window.Matter;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const key=wrap.dataset.pot, mem=potMem[key]||(potMem[key]={});
+  const EMO='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  let W=0,H=0,P=8,R=40,base=1,engine=null,bodies=[],queue=[],raf=0,last=0,lastAct=0,alive=true,label=null,col={},ro=null,startW=0;
+
+  function readColors(){
+    const cs=getComputedStyle(document.documentElement), g=n=>cs.getPropertyValue(n).trim();
+    col={pot:g('--surface'),rim:g('--line'),liquid:g(data.state==='bad'?'--bad-soft':data.state==='warn'?'--warn-soft':'--mint'),ink:g('--ink'),bg:g('--bg'),sunk:g('--sunk')};
+  }
+  function size(){
+    W=Math.max(220,wrap.clientWidth); H=Math.round(Math.min(330,Math.max(230,W*0.6)));
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); cv.style.height=H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    R=Math.min(70,W*0.16); base=Math.min(1.35,W/360);
+  }
+  function radii(){
+    let rs=data.items.map(x=>(13+7.5*Math.log10(Math.max(+x.amount||0,5000)/5000))*base);
+    const cap=0.52*(W-2*P)*(H-2*P), area=rs.reduce((a,r)=>a+Math.PI*r*r,0);
+    if(area>cap){ const f=Math.max(0.5,Math.sqrt(cap/area)); rs=rs.map(r=>r*f); }
+    else if(area && area<0.24*cap){ const f=Math.min(1.8,Math.sqrt(0.24*cap/area)); rs=rs.map(r=>r*f); } // ít món thì vẽ to cho dễ thương
+    return rs;
+  }
+  function potPath(){
+    const b=H-P;
+    ctx.beginPath(); ctx.moveTo(P,0); ctx.lineTo(P,b-R); ctx.quadraticCurveTo(P,b,P+R,b);
+    ctx.lineTo(W-P-R,b); ctx.quadraticCurveTo(W-P,b,W-P,b-R); ctx.lineTo(W-P,0);
+  }
+  function build(){
+    size(); readColors(); startW=W;
+    bodies=[]; queue=[];
+    const rs=radii(), fresh=[];
+    if(M){
+      engine=M.Engine.create({enableSleeping:true}); engine.gravity.y=1;
+      const t=60, st={isStatic:true,friction:0.3,restitution:0.2}, b=H-P;
+      const walls=[M.Bodies.rectangle(P-t/2,-H,t,H*4,st), M.Bodies.rectangle(W-P+t/2,-H,t,H*4,st), M.Bodies.rectangle(W/2,b+t/2,W,t,st)];
+      // bo góc đáy hũ bằng vài tấm nghiêng
+      for(const side of [-1,1]){ for(let k=0;k<4;k++){
+        const a0=k/4*Math.PI/2, a1=(k+1)/4*Math.PI/2;
+        const cx=side<0?P+R:W-P-R, cy=b-R;
+        const x0=cx+side*R*Math.sin(Math.PI/2-a0), y0=cy+R*Math.cos(Math.PI/2-a0);
+        const x1=cx+side*R*Math.sin(Math.PI/2-a1), y1=cy+R*Math.cos(Math.PI/2-a1);
+        const len=Math.hypot(x1-x0,y1-y0), ang=Math.atan2(y1-y0,x1-x0);
+        const nx=side*Math.sin(Math.PI/2-(a0+a1)/2), ny=Math.cos(Math.PI/2-(a0+a1)/2);
+        walls.push(M.Bodies.rectangle((x0+x1)/2+nx*10,(y0+y1)/2+ny*10,len+6,20,{...st,angle:ang}));
+      } }
+      M.Composite.add(engine.world,walls);
+    }
+    data.items.forEach((x,i)=>{
+      const r=rs[i], m=mem[x.id];
+      const opts={restitution:0.32,friction:0.35,frictionAir:0.012,density:0.0018,plugin:{item:x,emoji:itemEmoji(x),r}};
+      if(!M){ bodies.push({position:{x:0,y:0},angle:0,plugin:opts.plugin}); return; }
+      if(m){ const bd=M.Bodies.circle(Math.min(W-P-r,Math.max(P+r,m.x*W)),Math.min(H-P-r,m.y*H),r,{...opts,angle:m.a}); bodies.push(bd); }
+      else fresh.push({x,r,opts});
+    });
+    if(M) M.Composite.add(engine.world,bodies);
+    const step=fresh.length?Math.min(90,1600/fresh.length):0, now=performance.now();
+    fresh.forEach((f,i)=>{
+      const bd=M.Bodies.circle(P+f.r+Math.random()*(W-2*P-2*f.r), -f.r-10, f.r, {...f.opts,angle:(Math.random()-.5)*1.2});
+      M.Body.setVelocity(bd,{x:(Math.random()-.5)*2,y:2});
+      M.Body.setAngularVelocity(bd,(Math.random()-.5)*0.15);
+      queue.push({at:now+(bodies.length?250:120)+i*step, body:bd});
+    });
+    if(!M) layoutStatic();
+    if(M && reduce){ queue.forEach(q=>{ M.Composite.add(engine.world,q.body); bodies.push(q.body); }); queue=[]; for(let i=0;i<400;i++) M.Engine.update(engine,1000/60); save(); }
+  }
+  function layoutStatic(){ // không tải được thư viện vật lý: xếp gọn từ đáy lên
+    let x=P+4, y=H-P-4, rowH=0;
+    bodies.forEach(b=>{ const r=b.plugin.r; if(x+2*r>W-P){ x=P+4; y-=rowH+2; rowH=0; } b.position={x:x+r,y:y-r}; x+=2*r+2; rowH=Math.max(rowH,2*r); });
+  }
+  function save(){ bodies.forEach(b=>{ if(b.position.y<H*1.5) mem[b.plugin.item.id]={x:b.position.x/W,y:b.position.y/H,a:b.angle}; }); }
+  function draw(now){
+    ctx.clearRect(0,0,W,H);
+    potPath(); ctx.fillStyle=col.bg; ctx.fill();
+    // canh / nước
+    const lvl=Math.max(0.08,Math.min(1,data.level)), top=H-P-lvl*(H-P-14), amp=reduce?0:3.5, ph=now/700;
+    const wave=()=>{ ctx.beginPath(); ctx.moveTo(P,H); ctx.lineTo(P,top); for(let x=P;x<=W-P;x+=8) ctx.lineTo(x,top+Math.sin(x/38+ph)*amp+Math.sin(x/17-ph*1.3)*amp*0.4); ctx.lineTo(W-P,H); ctx.closePath(); };
+    ctx.save(); potPath(); ctx.clip();
+    wave(); ctx.globalAlpha=0.95; ctx.fillStyle=col.liquid; ctx.fill(); ctx.globalAlpha=1;
+    // món đồ
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const b of bodies){
+      const r=b.plugin.r; ctx.save(); ctx.translate(b.position.x,b.position.y); ctx.rotate(b.angle);
+      ctx.shadowColor='rgba(60,30,50,.18)'; ctx.shadowBlur=4; ctx.shadowOffsetY=2;
+      ctx.font=Math.round(r*1.62)+'px '+EMO; ctx.fillText(b.plugin.emoji,0,r*0.08); ctx.restore();
+    }
+    // lớp canh phía trước, mờ, để món như đang ngâm trong hũ
+    wave(); ctx.globalAlpha=0.22; ctx.fillStyle=col.liquid; ctx.fill(); ctx.globalAlpha=1;
+    ctx.restore();
+    potPath(); ctx.lineWidth=3; ctx.strokeStyle=col.rim; ctx.stroke();
+    if(label && now<label.until){
+      const b=label.b, txt=label.text; ctx.font='600 13px "Be Vietnam Pro",system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const w=ctx.measureText(txt).width+20, h=28;
+      let x=Math.min(W-w/2-4,Math.max(w/2+4,b.position.x)), y=Math.max(h/2+4,b.position.y-b.plugin.r-h/2-6);
+      ctx.fillStyle=col.ink; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x-w/2,y-h/2,w,h,10):ctx.rect(x-w/2,y-h/2,w,h); ctx.fill();
+      ctx.fillStyle=col.bg; ctx.fillText(txt,x,y+1);
+    } else label=null;
+  }
+  function frame(now){
+    if(!alive) return;
+    while(queue.length && now>=queue[0].at){ const q=queue.shift(); M.Composite.add(engine.world,q.body); bodies.push(q.body); }
+    M.Engine.update(engine,1000/60);
+    for(const b of bodies) if(b.position.y>H+200||b.position.x<-50||b.position.x>W+50){ M.Body.setPosition(b,{x:W/2,y:-40}); M.Body.setVelocity(b,{x:0,y:0}); }
+    draw(now);
+    if(queue.length || bodies.some(b=>!b.isSleeping && b.speed>0.08)) lastAct=now;
+    if(now-lastAct>1200 && !label){ raf=0; save(); return; }
+    raf=requestAnimationFrame(frame);
+  }
+  function wake(){ lastAct=performance.now(); if(M && !reduce && !raf && alive) raf=requestAnimationFrame(frame); else draw(performance.now()); }
+  function shake(power=1){
+    if(!M||!bodies.length) return;
+    if(!reduce){ wrap.classList.remove('shake'); void wrap.offsetWidth; wrap.classList.add('shake'); }
+    for(const b of bodies){ M.Sleeping.set(b,false);
+      M.Body.setVelocity(b,{x:(Math.random()-.5)*7*power, y:-(3+Math.random()*7)*power*Math.min(1.2,base)});
+      M.Body.setAngularVelocity(b,(Math.random()-.5)*0.35*power); }
+    if(reduce){ for(let i=0;i<400;i++) M.Engine.update(engine,1000/60); save(); draw(performance.now()); return; }
+    wake();
+  }
+  let down=null;
+  const onDown=e=>{ down={x:e.clientX,y:e.clientY}; };
+  const onUp=e=>{
+    if(!down) return; const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y); down=null; if(moved>10) return;
+    enableMotion();
+    const rc=cv.getBoundingClientRect(), pt={x:e.clientX-rc.left,y:e.clientY-rc.top};
+    const hit=bodies.slice().reverse().find(b=>Math.hypot(b.position.x-pt.x,b.position.y-pt.y)<=b.plugin.r);
+    if(hit){ const x=hit.plugin.item; label={b:hit,text:(x.note||catById(x.cat).name)+' · '+fmtShort(x.amount),until:performance.now()+2200}; if(M){ M.Sleeping.set(hit,false); M.Body.setVelocity(hit,{x:(Math.random()-.5)*2,y:-4}); } wake(); }
+    else shake(1);
+  };
+  cv.addEventListener('pointerdown',onDown); cv.addEventListener('pointerup',onUp);
+  const mq=matchMedia('(prefers-color-scheme: dark)'), onTheme=()=>{ readColors(); draw(performance.now()); };
+  mq.addEventListener&&mq.addEventListener('change',onTheme);
+  build(); draw(performance.now()); if(M && !reduce) wake();
+  if(window.ResizeObserver){ ro=new ResizeObserver(()=>{ if(Math.abs(wrap.clientWidth-startW)>24){ save(); if(engine) M.Engine.clear(engine); cancelAnimationFrame(raf); raf=0; build(); wake(); } }); ro.observe(wrap); }
+  return {
+    shake,
+    destroy(){ alive=false; cancelAnimationFrame(raf); save(); ro&&ro.disconnect(); mq.removeEventListener&&mq.removeEventListener('change',onTheme); if(engine) M.Engine.clear(engine); }
+  };
+}
+
 /* ============ điều hướng ============ */
 const ROUTES={'tong-quan':viewHome,'giao-dich':viewList,'bao-cao':viewReport,'ke-hoach':viewPlan,'cai-dat':viewSettings};
 const current = () => { const h=location.hash.slice(1); return ROUTES[h]?h:'tong-quan'; };
 function render(){
   const r=current(), v=document.getElementById('view'), y=window.scrollY;
+  destroyPots();
   v.innerHTML=ROUTES[r]();
+  mountPots();
   document.querySelectorAll('[data-nav]').forEach(a=>{ if(a.dataset.nav===r) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
   paintSync();
   const qi=document.getElementById('q');
