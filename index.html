@@ -387,7 +387,7 @@ a.secondary{color:var(--ink);display:block}
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.05-8';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.05-9';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -803,7 +803,7 @@ const DISHES = [
 const CUISINES = {vn:{n:'Việt',f:'🇻🇳'},han:{n:'Hàn',f:'🇰🇷'},nhat:{n:'Nhật',f:'🇯🇵'},thai:{n:'Thái',f:'🇹🇭'},trung:{n:'Trung',f:'🇨🇳'},au:{n:'Âu Mỹ',f:'🍔'},khac:{n:'Khác',f:'🌏'}};
 const EAT_CUI = [['auto','✨ Tự chọn'],['vn-nuoc','🇻🇳 Việt · đồ nước'],['vn-kho','🇻🇳 Việt · cơm, khô'],['han','🇰🇷 Hàn'],['nhat','🇯🇵 Nhật'],['thai','🇹🇭 Thái'],['trung','🇨🇳 Trung'],['au','🍔 Âu Mỹ']];
 const CUI_KW = [
-  ['uong','tra sua|cafe|ca phe|cf|nuoc ep|sinh to|tra dao|tra chanh|tra|bia|coca|pepsi|nuoc ngot|sua chua|che|kem|matcha latte|smoothie'],
+  ['uong','tra sua|cafe|ca phe|cf|nuoc ep|sinh to|tra dao|tra chanh|tra|bia|coca|pepsi|nuoc ngot|sua chua|che|kem|matcha|smoothie|khoai mon latte|latte|cappuccino|espresso|americano|bac xiu|nuoc sam|nuoc mia|nuoc dua|nuoc chanh|nuoc cam|nuoc tac|nuoc suoi|nuoc loc|nuoc uong|ly nuoc|chai nuoc|soda|yakult|sua tuoi|sua dau|sua hat|tra tac|tra quat|tra vai|cacao|chocolate da|da me|rau ma|sam bi dao|nuoc rau ma'],
   ['han','han quoc|tokbokki|tteokbokki|kimbap|gimbap|bibimbap|kimchi|bulgogi|samgyeopsal|jjajang|mi cay|mi tuong den|lau han|ga ran han|com tron|soju|ramyeon|korean|thit nuong han'],
   ['nhat','nhat|sushi|sashimi|ramen|udon|soba|katsu|tonkatsu|takoyaki|tempura|onigiri|bento|donburi|ca ri nhat|cari nhat'],
   ['thai','lau thai|tom yum|tomyum|pad thai|xoi xoai|com chien thai|com chien dua|goi du du|do thai|mon thai'],
@@ -814,6 +814,7 @@ const VN_NUOC = /(^|\s)(pho|bun bo|bun rieu|bun mam|bun ca|bun moc|bun thang|hu 
 function cuisineOf(note){
   const n=' '+norm(note)+' ';
   for(const [c,re] of CUI_KW) if(re.test(n)) return c==='uong'?{c:'uong',sub:'uong'}:{c,sub:VN_NUOC.test(n)?'nuoc':''};
+  if(/^ nuoc( |$)/.test(n) || /\s(ly|chai|lon) nuoc\s/.test(n)) return {c:'uong',sub:'uong'};   // chỉ ghi "nước"
   return {c:'vn',sub:VN_NUOC.test(n)?'nuoc':'kho'};
 }
 const cuiOfTx = x => { const r=(S.settings.reviews||{})[x.id]; const g=cuisineOf(x.note); return r&&r.cuisine?{c:r.cuisine,sub:g.sub}:g; };
@@ -1437,8 +1438,12 @@ function catEditRow(c){
 
 /* ============ hũ canh: mỗi khoản chi là một món rơi vào hũ ============ */
 const ITEM_EMOJI = [
-  ['tra sua|milk tea|boba|gong cha|tocotoco|koi','🧋'],['cafe|ca phe|cf|highland|highlands|phuc long|starbucks|katinat|cong ca','☕'],
-  ['sinh to|nuoc ep|nuoc mia|smoothie','🥤'],['coca|pepsi|nuoc ngot|sting|7up|redbull','🥤'],['tra','🍵'],['bia|beer|ruou|bar|pub','🍺'],
+  ['tra sua|milk tea|boba|gong cha|tocotoco|koi|latte khoai mon|khoai mon latte|matcha latte|tra xanh latte|matcha|tran chau','🧋'],
+  ['latte|cappuccino|espresso|americano|bac xiu|cold brew','☕'],
+  ['nuoc dua|dua tuoi','🥥'],['bia|beer|ruou|bar|pub','🍺'],
+  ['nuoc sam|nuoc mia|nuoc chanh|nuoc cam|nuoc tac|nuoc rau ma|rau ma|sam bi dao|da me|tra tac|tra quat|tra vai|soda|yakult|cacao|nuoc suoi|nuoc loc|nuoc uong|ly nuoc|chai nuoc','🥤'],
+  ['sua tuoi|sua dau|sua hat','🥛'],['cafe|ca phe|cf|highland|highlands|phuc long|starbucks|katinat|cong ca','☕'],
+  ['sinh to|nuoc ep|nuoc mia|smoothie','🥤'],['coca|pepsi|nuoc ngot|sting|7up|redbull','🥤'],['tra','🍵'],
   ['kem chong nang|my pham|son|skincare|serum|sua rua mat','💄'],['kem|ice cream','🍦'],
   ['banh mi','🥖'],['banh chung|banh tet','🫔'],['banh trang|an vat|snack|bap rang','🍿'],['banh|cake|tiramisu','🍰'],
   ['pho|bun|hu tieu|mi|mien|chao|banh canh','🍜'],['lau|hotpot','🍲'],['com|com tam|com trua','🍚'],['xoi','🍙'],
@@ -1455,7 +1460,9 @@ const ITEM_EMOJI = [
   ['sach','📚'],['hoc phi|khoa hoc|hoc|ielts|toeic|udemy|coursera','🎓'],
   ['gui me|cho me|gui ba|cho ba|bieu|li xi','🧧'],['qua|sinh nhat','🎁'],['dam cuoi|mung cuoi|hieu hi','💒']
 ].map(([k,e])=>[new RegExp('(^|\\s)('+k+')(\\s|$)'),e]);
-function itemEmoji(x){ const n=' '+norm(x.note)+' '; for(const [re,e] of ITEM_EMOJI) if(re.test(n)) return e; return catById(x.cat).icon; }
+function itemEmoji(x){ const n=' '+norm(x.note)+' '; for(const [re,e] of ITEM_EMOJI) if(re.test(n)) return e;
+  if(/^ nuoc /.test(n) || /\s(nuoc|ly|chai|lon)\s*$/.test(n) || (x.cat==='an' && cuisineOf(x.note).c==='uong')) return '🥤';   // có chữ "nước" / là đồ uống
+  return catById(x.cat).icon; }
 
 const POT_DATA={}, potMem={};
 let pots=[], motionOn=false, motionAsked=false, lastShake=0;
