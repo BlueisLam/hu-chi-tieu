@@ -1051,7 +1051,7 @@ const authMsg = m => /invalid login/i.test(m)?'Sai email hoặc mật khẩu.'
   : /already registered|already exists/i.test(m)?'Email này đã có tài khoản. Chuyển sang Đăng nhập.'
   : /rate limit|too many/i.test(m)?'Gửi quá nhiều lần. Đợi vài phút rồi thử lại.'
   : /at least|weak|password should/i.test(m)?'Mật khẩu cần ít nhất 6 ký tự.'
-  : /signups? not allowed|signup is disabled/i.test(m)?'Project Supabase đang tắt đăng ký tài khoản mới.'
+  : /signups? not allowed|signup is disabled/i.test(m)?'App không cho tự đăng ký. Tạo tài khoản trong Supabase → Authentication → Users → Add user (tick Auto Confirm), rồi quay lại Đăng nhập.'
   : m;
 function showLogin(msg, tab){
   tab = tab || 'in';
