@@ -72,4 +72,32 @@ assert.match(sent, /KHÔNG gợi ý lại quán này.*Quán X/); assert.match(se
 sent='';
 await onRequestPost({ request: req('Bearer good', { ...B, group: 'nhom', people: 5 }), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
 assert.match(sent, /đi ăn nhóm 5 người bạn/); assert.match(sent, /không gợi ý tự nấu/); ok('Prompt ăn nhóm');
+// 12. Có vị trí → gọi Gemini kèm Google Maps, gắn link quán
+let lastBody=null; const f0=globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+  if (String(url).includes('generativelanguage')) {
+    lastBody = JSON.parse(init.body);
+    if (lastBody.tools) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '```json\n' + JSON.stringify(AI_OK) + '\n```' }] },
+      groundingMetadata: { groundingChunks: [{ maps: { uri: 'https://maps.google.com/?cid=123', title: 'Bún Bò Bà Năm' } }] } }] }), { status: 200 });
+  }
+  return f0(url, init);
+};
+r = await onRequestPost({ request: req('Bearer good', { ...B, lat: 10.77689, lng: 106.70081, favorites: ['Cơm tấm (~45k, 12 lần)'], hidden: ['Pizza'] }), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
+d = await r.json();
+assert.equal(r.status, 200); assert.equal(d.maps, true); assert.deepEqual(lastBody.tools, [{ googleMaps: {} }]);
+assert.equal(lastBody.toolConfig.retrievalConfig.latLng.latitude, 10.777); assert.equal(d.items[0].map_url, 'https://maps.google.com/?cid=123');
+assert.match(lastBody.contents[0].parts[0].text, /CÓ THẬT trên Google Maps/); assert.match(lastBody.contents[0].parts[0].text, /KHÔNG gợi ý: Pizza/);
+assert.match(lastBody.contents[0].parts[0].text, /hay ăn.*Cơm tấm/); ok('Có vị trí → Google Maps grounding + link quán');
+
+// 13. Google Maps lỗi 400 → tự gọi lại không kèm Maps
+let n2=0;
+globalThis.fetch = async (url, init) => {
+  if (String(url).includes('generativelanguage')) { const b2=JSON.parse(init.body); n2++;
+    if (b2.tools) return new Response('{"error":{"message":"Tool google_maps is not supported"}}', { status: 400 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(AI_OK) }] } }] }), { status: 200 }); }
+  return f0(url, init);
+};
+r = await onRequestPost({ request: req('Bearer good', { ...B, lat: 10.7, lng: 106.7 }), env: { GEMINI_API_KEY: 'k'.repeat(20) } });
+d = await r.json(); assert.equal(r.status, 200); assert.equal(d.maps, undefined); assert.equal(n2, 2); ok('Maps lỗi → gợi ý thường');
+globalThis.fetch = f0;
 console.log('Tất cả', n, 'test đạt');

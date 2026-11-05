@@ -216,6 +216,17 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 .eat-acts{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px}
 .eat-acts .acts{display:flex;gap:8px}
 .btn-s:disabled{opacity:.5;cursor:default}
+/* menu + bản đồ */
+a.secondary{color:var(--ink);display:block}
+.maplink{display:inline-block;margin-top:4px;font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none}
+.flag{font-size:12px}
+.place-row{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-bottom:8px}
+.place-row:first-of-type{border-top:0}
+.place-row .tx{border-top:0}
+.place-acts{display:flex;gap:8px;padding-left:52px}
+.place-acts a{text-decoration:none}
+.menu-row.is-hidden{opacity:.55}
+.hid summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 2px}
 /* ẩm thực + chấm điểm */
 .stepper{display:inline-flex;align-items:center;gap:8px;background:var(--sunk);border-radius:14px;padding:3px}
 .stepper button{width:30px;height:30px;border-radius:10px;background:var(--surface);font-weight:700}
@@ -337,6 +348,7 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
     <a href="#giao-dich" data-nav="giao-dich"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg>Giao dịch</a>
     <a href="#bao-cao" data-nav="bao-cao"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Báo cáo</a>
     <a href="#ke-hoach" data-nav="ke-hoach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="7" width="16" height="13" rx="4"/><path d="M8 7V5h8v2"/></svg>Kế hoạch</a>
+    <a href="#menu" data-nav="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 8h6M9 12h6"/></svg>Menu của tôi</a>
     <a href="#cai-dat" data-nav="cai-dat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Cài đặt</a>
     <button class="primary" data-open-add>＋ Ghi khoản chi</button>
     <span class="sync" data-sync><i></i><span>…</span></span>
@@ -361,7 +373,7 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.05-3';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.05-4';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -595,7 +607,7 @@ function parse(raw){
     let best=null,bestLen=0; const pad=' '+note+' ';
     const kw = {...KEYWORDS}; cats().forEach(c=>{ const n=norm(c.name); (kw[c.id]=(kw[c.id]||[]).concat([n])); });
     for(const [cat,list] of Object.entries(kw)) if(valid(cat)) for(const k of list) if(k.length>bestLen && pad.includes(' '+k+' ')){ best=cat; bestLen=k.length; }
-    out.cat=best||'khac';
+    out.cat=best||(note && CUI_KW.some(([c,re])=>re.test(pad))?'an':'khac');   // món Hàn, Nhật, Thái, đồ uống… cũng là Ăn uống
   }
   return out;
 }
@@ -694,6 +706,46 @@ function potWhoSeg(list){
   if(!opts.some(o=>o.id===potWho)) potWho='all';
   return `<div class="seg seg-s" role="group" aria-label="Xem hũ của ai">${opts.map(o=>`<button data-potwho="${o.id}" aria-pressed="${potWho===o.id}">${esc(o.name)}</button>`).join('')}</div>`;
 }
+
+/* ============ menu của tôi + Google Maps ============ */
+const mapsSearch = q => 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);
+const mapsDir = q => 'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(q);
+const placesDb = () => S.settings.places||(S.settings.places={});
+const placeInfo = name => (S.settings.places||{})[norm(name)]||null;
+const placeUrl = name => { const p=placeInfo(name); return p&&p.url ? p.url : mapsSearch(name); };
+const placeDirUrl = name => { const p=placeInfo(name); return mapsDir(p&&p.addr ? name+', '+p.addr : name); };
+function nameFromMapsUrl(u){ const m=String(u||'').match(/\/maps\/place\/([^/@?]+)/); try{ return m?decodeURIComponent(m[1].replace(/\+/g,' ')).trim():''; }catch(e){ return ''; } }
+const isMapsUrl = u => /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(String(u||'').trim());
+const mealOfTs = ts => { const h=new Date(ts).getHours(); return h<10?'sang':h<14?'trua':h<17?'vat':'toi'; };
+function buildMenu(){
+  const M={}, R=S.settings.reviews||{}, ov=S.settings.menu||{};
+  live().filter(x=>x.cat==='an' && !x.sample).forEach(x=>{
+    const k=norm(x.note); if(!k) return; const g=cuisineOf(x.note);
+    const o=M[k]||(M[k]={key:k,name:x.note,n:0,sum:0,last:'',meals:{},places:{},scores:[],cui:g.c,sub:g.sub});
+    o.n++; o.sum+=(+x.amount||0)/(whoOf(x)==='chung'?2:1);
+    if(x.date>=o.last){ o.last=x.date; o.name=x.note; }
+    if(x.ts && dayKey(x.ts)===x.date){ const m=mealOfTs(x.ts); o.meals[m]=(o.meals[m]||0)+1; }
+    const r=R[x.id]; if(r){ if(r.place) o.places[r.place]=(o.places[r.place]||0)+1; if(r.score) o.scores.push(r.score); if(r.cuisine) o.cui=r.cuisine; }
+  });
+  Object.entries(ov).forEach(([k,v])=>{ if(!M[k]){ const g=cuisineOf(v.name||k); M[k]={key:k,name:v.name||k,n:0,sum:0,last:'',meals:{},places:{},scores:[],cui:v.cui||g.c,sub:g.sub,manual:true}; } });
+  return Object.values(M).map(o=>{
+    const v=ov[o.key]||{}, avg=o.n?Math.round(o.sum/o.n/1000)*1000:0;
+    const top=(obj)=>{ const e=Object.entries(obj).sort((a,b)=>b[1]-a[1])[0]; return e?e[0]:''; };
+    const score=o.scores.length?o.scores.reduce((a,b)=>a+b,0)/o.scores.length:0;
+    const name=v.name||o.name;
+    return {...o,name,price:v.price||avg,cui:v.cui||o.cui,place:v.place||top(o.places),score,meal:top(o.meals),hidden:!!v.hidden,manual:!!o.manual,emoji:itemEmoji({note:name,cat:'an'})};
+  });
+}
+const hiddenKeys = () => new Set(Object.entries(S.settings.menu||{}).filter(([k,v])=>v.hidden).map(([k])=>k));
+function placeList(){
+  const by={};
+  reviewList().forEach(r=>{ if(!r.place) return; const k=norm(r.place); const o=by[k]||(by[k]={key:k,name:r.place,sum:0,n:0,dishes:{},cui:r.cuisine,last:r});
+    o.sum+=r.score; o.n++; o.dishes[r.dish]=Math.max(o.dishes[r.dish]||0,r.score); if(String(r.date)>=String(o.last.date)) o.last=r; });
+  Object.values(S.settings.reviews||{}).forEach(r=>{ if(r.place && !r.score){ const k=norm(r.place); by[k]=by[k]||{key:k,name:r.place,sum:0,n:0,dishes:{[r.dish]:0},cui:r.cuisine,last:r}; } });
+  Object.entries(S.settings.places||{}).forEach(([k,p])=>{ if(!by[k]) by[k]={key:k,name:p.name,sum:0,n:0,dishes:{},cui:'',last:{}}; });
+  return Object.values(by).map(o=>({...o,avg:o.n?o.sum/o.n:0,info:(S.settings.places||{})[o.key]||{}})).sort((a,b)=>b.avg-a.avg||b.n-a.n);
+}
+
 /* ============ hôm nay ăn gì ============ */
 // [tên, emoji, giá/người, bữa phù hợp, nhãn]
 // [tên, emoji, giá/người, bữa phù hợp, nhãn, ẩm thực]
@@ -790,7 +842,8 @@ function mealBudget(){
   const per=Math.min(200000,Math.max(20000,Math.round(med*(eat.meal==='vat'?0.6:1)*(eat.group==='nhom'?1.3:1)/5000)*5000));
   return {per, note:'Chưa đặt ngân sách Ăn uống nên dùng giá trung bình các bữa gần đây'};
 }
-function localSuggest(per){
+const shownMemo={};
+function localSuggest(per, _depth){
   const T=S.settings.taste||{}, avoid=tasteWords(T.avoid), likes=tasteWords(T.likes);
   const recent=recentFood(4).map(x=>norm(x.note)), rnd=seeded(eatKey()+'#'+eat.reroll);
   const eatenRecently = n => recent.some(r=>r && (r.includes(n) || n.includes(r)));
@@ -799,9 +852,10 @@ function localSuggest(per){
     : want==='vn-nuoc' ? cui==='vn' && /nuoc/.test(tags) : want==='vn-kho' ? cui==='vn' && !/nuoc/.test(tags) && !/uong/.test(tags) : cui===want;
   let base=DISHES.filter(d=>fitCui(d[5],d[4]) && d[3].split(' ').includes(eat.meal));
   if(base.length<4) base=DISHES.filter(d=>fitCui(d[5],d[4]));   // ít món hợp bữa thì nới điều kiện bữa
+  const hid=hiddenKeys();
   const pool=base.map(([ten,emoji,gia,meals,tags,cui])=>{
     const n=norm(ten), hay=n+' '+tags;
-    if(avoid.some(a=>hay.includes(a))) return null;
+    if(avoid.some(a=>hay.includes(a)) || hid.has(n)) return null;
     let score=rnd()*1.2, why=[];
     const share=NHOM.test(' '+n+' ')||/nhieu/.test(tags);
     if(eat.group==='nhom'){ if(share){ score+=2.4; why.push('Hợp ăn nhóm'); } else if(/tu-nau/.test(tags)) score-=3; else score-=0.6; }
@@ -819,14 +873,31 @@ function localSuggest(per){
     const k=norm(r.place||r.dish); if(seenPlace.has(k)) return; seenPlace.add(k);
     const n=norm(r.dish); if(avoid.some(a=>n.includes(a))) return;
     const gia=Math.round((r.amount||per)/((r.who==='chung')?2:1)/1000)*1000;
-    let score=rnd()*1.2+ (r.score-7)*0.6 - (eatenRecently(n)?3:0) - Math.max(0,(gia-per)/per)*2;
+    let score=rnd()*1.6+ (r.score-7)*0.3 - (eatenRecently(n)?3:0) - Math.max(0,(gia-per)/per)*2;
     pool.push({ten:r.dish,emoji:itemEmoji({note:r.dish,cat:'an'}),gia,cach:'quán',cui:r.cuisine||'vn',quan:r.place||'',diem:r.score,
-      ly_do:`Bạn chấm ${r.score}/10`+(r.review?' · '+r.review:''),score,kind:'review'+k});
+      ly_do:`Bạn chấm ${r.score}/10`+(r.review?' · '+r.review:''),score,kind:want==='auto'?(r.cuisine||'vn'):(r.cuisine||'vn')+(VN_NUOC.test(' '+n+' ')?'nuoc':(r.cuisine||'vn')==='vn'?'kho':'')});
   });
+  // món quen trong Menu của tôi
+  buildMenu().filter(m=>!m.hidden && m.price>0 && (m.cui!=='uong'||eat.meal==='vat') && fitCui(m.cui, m.sub==='nuoc'?'nuoc':'kho')).forEach(m=>{
+    if(avoid.some(a=>m.key.includes(a))) return;
+    let score=rnd()*1.6+Math.min(0.7,Math.log2(1+m.n)*0.3)+(m.score?(m.score-7)*0.3:0)-(eatenRecently(m.key)?3:0);
+    if(m.meal && m.meal!==eat.meal) score-=0.6;
+    const diff=(m.price-per)/per; score-=Math.max(0,diff)*(eat.group==='nhom'?0.8:2.5);
+    if(eat.group==='nhom' && NHOM.test(' '+m.key+' ')) score+=2;
+    pool.push({ten:m.name,emoji:m.emoji,gia:m.price,cach:'quán',cui:m.cui,quan:m.place,diem:m.score?Math.round(m.score*10)/10:0,score,kind:want==='auto'?m.cui:m.cui+(m.sub==='nuoc'?'nuoc':m.cui==='vn'?'kho':''),
+      ly_do:(m.n?`Món quen · ăn ${m.n} lần`:'Món bạn tự thêm')+(eatenRecently(m.key)?'':' · mấy hôm chưa ăn')});
+  });
+  // xoay vòng: món vừa hiện ở lượt trước thì nhường chỗ ở lượt sau
+  if(eat.reroll>0 && !_depth){ const pk=eatKey()+'#'+(eat.reroll-1);
+    const prevNames=shownMemo[pk]||(()=>{ eat.reroll--; const r=localSuggest(per,1).map(d=>norm(d.ten)); eat.reroll++; return r; })();
+    pool.forEach(d=>{ if(prevNames.includes(norm(d.ten))) d.score-=2; }); }
   pool.sort((a,b)=>b.score-a.score);
+  { const seen=new Map(); for(let i=0;i<pool.length;i++){ const k=norm(pool[i].ten), d=pool[i];
+      if(seen.has(k)){ const keep=seen.get(k); if(!keep.quan && d.quan){ keep.quan=d.quan; keep.diem=d.diem; } pool.splice(i--,1); } else seen.set(k,d); } }
   const out=[], kinds=new Set();
   for(const d of pool){ if(out.length>=3) break; if(kinds.has(d.kind) && pool.length>6) continue; kinds.add(d.kind); out.push(d); }
   for(const d of pool){ if(out.length>=3) break; if(!out.includes(d)) out.push(d); }
+  if(!_depth) shownMemo[eatKey()+'#'+eat.reroll]=out.map(d=>norm(d.ten));
   return out;
 }
 function eatTip(){
@@ -856,12 +927,13 @@ function eatCard(){
     <div class="eat-list">${eat.loading?[0,1,2].map(()=>'<div class="eat-i ghost"><span class="eat-e">🍽️</span><div><b>Đang nghĩ món…</b><small>&nbsp;</small></div></div>').join(''):
       items.map((d,i)=>`<div class="eat-i"><span class="eat-e">${esc(d.emoji)}</span><div class="eat-t"><b>${esc(d.ten)}</b>
         <small class="num">${fmtShort(d.gia)}${eat.people>1?'/người':''}${eat.people>1?' · cả '+(eat.group==='nhom'?'nhóm':'2 người')+' ~'+fmtShort(d.gia*eat.people):''} · ${esc(d.cach)}${d.cui&&CUISINES[d.cui]?' · '+CUISINES[d.cui].f:''}</small>
-        ${d.quan?`<small class="eat-q">📍 ${esc(d.quan)}${d.diem?` · ★ ${d.diem}/10`:''}</small>`:''}<p>${esc(d.ly_do||'')}</p></div>
+        ${d.quan?`<small class="eat-q">📍 ${esc(d.quan)}${d.diem?` · ★ ${d.diem}/10`:''}${d.xa?` · ${esc(d.xa)}`:''}</small>`:''}<p>${esc(d.ly_do||'')}</p>
+        ${d.cach!=='tự nấu'?`<a class="maplink" href="${esc(d.map_url||(d.quan?placeUrl(d.quan):mapsSearch(d.ten+' gần đây')))}" target="_blank" rel="noopener">🗺️ ${d.quan?'Xem quán trên Google Maps':'Tìm quán gần đây'}</a>`:''}</div>
         <button class="btn-s" data-eatpick="${i}">Ăn món này</button></div>`).join('')}</div>
     ${tip&&!eat.loading?`<p class="eat-tip">💡 ${esc(tip)}</p>`:''}
     <div class="eat-acts">
-      <span class="lbl">${ai?'AI gợi ý'+(ai.provider?' · '+esc(ai.provider==='gemini'?'Gemini':'Groq'):''):'Gợi ý nhanh trên máy'}</span>
-      <div class="acts"><button class="btn-s ghost" data-eat="reroll" ${eat.loading?'disabled':''}>Đổi món khác</button>
+      <span class="lbl">${ai?'AI gợi ý'+(ai.provider?' · '+esc(ai.provider==='gemini'?'Gemini':'Groq'):'')+(ai.maps?' · Google Maps':''):'Gợi ý nhanh trên máy'}</span>
+      <div class="acts"><a class="btn-s ghost" href="#menu" style="text-decoration:none">📖 Menu</a><button class="btn-s ghost" data-eat="reroll" ${eat.loading?'disabled':''}>Đổi món khác</button>
       ${canAI?`<button class="btn-s" data-eat="ai" ${eat.loading?'disabled':''}>✨ ${ai?'Hỏi lại AI':'Hỏi AI'}</button>`:''}</div></div>
   </section>`;
 }
@@ -873,6 +945,12 @@ async function askAI(){
   const exclude=[...new Set([...(prev&&prev.seen||[]),...shown])].slice(-15);
   eat.loading=true; render();
   try{
+    let geo=null;
+    if(store.get('hct_geo',false) && navigator.geolocation){
+      const pos=await new Promise(res=>navigator.geolocation.getCurrentPosition(res,()=>res(null),{timeout:7000,maximumAge:600000,enableHighAccuracy:false}));
+      if(pos) geo={lat:+pos.coords.latitude.toFixed(3),lng:+pos.coords.longitude.toFixed(3)}; else toast('Không lấy được vị trí, gợi ý không kèm quán gần',3000);
+    }
+    const menu=buildMenu();
     const session=(await sb.auth.getSession()).data.session;
     if(!session) throw new Error('Phiên đăng nhập đã hết, hãy đăng nhập lại.');
     const T=S.settings.taste||{}, B=mealBudget();
@@ -882,11 +960,14 @@ async function askAI(){
         cuisine:eat.cui==='auto'?'':(EAT_CUI.find(c=>c[0]===eat.cui)||[,''])[1].replace(/^\S+\s/,''),
         cuisineStats:statsText(cuisineStats(7)),
         good:reviewList().filter(r=>r.score>=8).sort((a,b)=>b.score-a.score).slice(0,10).map(reviewLine),
-        bad:reviewList().filter(r=>r.score<=5).slice(0,8).map(reviewLine),note:T.note||''})});
+        bad:reviewList().filter(r=>r.score<=5).slice(0,8).map(reviewLine),
+        favorites:menu.filter(m=>!m.hidden&&m.n>=2&&m.cui!=='uong').sort((a,b)=>b.n-a.n).slice(0,10).map(m=>`${m.name} (~${fmtShort(m.price)}, ${m.n} lần${m.place?', quán '+m.place:''}${m.score?', '+m.score.toFixed(1)+'/10':''})`),
+        hidden:menu.filter(m=>m.hidden).map(m=>m.name).slice(0,20),
+        ...(geo?{lat:geo.lat,lng:geo.lng}:{}),note:T.note||''})});
     let d={}; try{ d=await r.json(); }catch(e){}
     if(!r.ok){ if(d.code==='no_key') aiAvail=false; throw new Error(d.error||('Lỗi '+r.status)); }
     eat.reroll++;
-    store.set(eatKey(),{items:d.items,tip:d.tip,provider:d.provider,reroll:eat.reroll,seen:[...exclude,...d.items.map(x=>x.ten)].slice(-15)});
+    store.set(eatKey(),{items:d.items,tip:d.tip,provider:d.provider,maps:!!d.maps,reroll:eat.reroll,seen:[...exclude,...d.items.map(x=>x.ten)].slice(-15)});
   }catch(e){ toast(e.message||'AI chưa trả lời được, thử lại sau',3500); }
   eat.loading=false; render();
 }
@@ -1072,6 +1153,93 @@ function placeBook(){
       :'<div class="empty">Ăn xong bấm vào khoản chi rồi chọn “Chấm điểm quán”. Quán điểm cao sẽ được gợi ý quay lại.</div>'}</section>`;
 }
 
+
+/* ============ màn Menu của tôi ============ */
+let menuQ='', menuCui='all', menuSort='n';
+function viewMenu(){
+  const all=buildMenu(), places=placeList();
+  const cuiOpts=[['all','Tất cả'],...Object.entries(CUISINES).filter(([k])=>k!=='khac').map(([k,v])=>[k,v.f+' '+v.n]),['uong','🧋 Đồ uống']];
+  let list=all.filter(m=>(menuCui==='all'||m.cui===menuCui)&&(!menuQ||m.key.includes(norm(menuQ))||norm(m.place).includes(norm(menuQ))));
+  list.sort(menuSort==='score'?(a,b)=>b.score-a.score||b.n-a.n:menuSort==='price'?(a,b)=>(a.price||9e9)-(b.price||9e9):(a,b)=>b.n-a.n||String(b.last).localeCompare(String(a.last)));
+  const shown=list.filter(m=>!m.hidden), hid=list.filter(m=>m.hidden);
+  const row=m=>`<button class="tx menu-row${m.hidden?' is-hidden':''}" data-menu="${esc(m.key)}"><span class="dot" style="background:var(--peach)">${m.emoji}</span>
+    <span class="t"><b>${esc(m.name)}${m.cui&&CUISINES[m.cui]?' <small class="flag">'+CUISINES[m.cui].f+'</small>':''}${m.hidden?'<span class="pend">Đã ẩn</span>':''}</b>
+    <small class="num">${m.n?m.n+' lần':'Tự thêm'}${m.price?' · ~'+fmtShort(m.price):''}${m.meal?' · hay ăn '+MEAL_NAME[m.meal].toLowerCase():''}${m.place?' · 📍 '+esc(m.place):''}</small></span>
+    <span class="amt">${m.score?'<span class="star num">★'+(Math.round(m.score*10)/10)+'</span>':''}</span></button>`;
+  return `${mobileTop('Menu của tôi')}
+  <div class="page-h"><h2>Menu của tôi</h2><button class="btn-s" data-act="menu-add">＋ Thêm món</button></div>
+  <p class="lbl">Món tự được thêm mỗi khi bạn ghi một khoản Ăn uống. Gợi ý “Hôm nay ăn gì?” dùng menu này, món đã ẩn sẽ không được gợi ý.</p>
+  <section class="card"><div class="card-h"><h2>Quán quen</h2><button class="btn-s ghost" data-act="place-add">＋ Thêm quán</button></div>
+    ${places.length?places.slice(0,15).map(o=>{ const best=Object.entries(o.dishes).sort((a,b)=>b[1]-a[1]).map(e=>e[0]).slice(0,2).join(', ');
+      const st=o.avg>=8?'good':o.avg&&o.avg<=5?'bad':'';
+      return `<div class="place-row"><button class="tx" data-place="${esc(o.key)}"><span class="dot score-dot ${st}">${o.n?(o.avg%1?o.avg.toFixed(1):o.avg):'–'}</span>
+        <span class="t"><b>${esc(o.name)}${o.info.url?' <small class="flag">🗺️</small>':''}</b><small>${o.cui&&CUISINES[o.cui]?CUISINES[o.cui].f+' ':''}${esc(best||'Chưa chấm món nào')}${o.n>1?' · '+o.n+' lần chấm':''}${o.info.addr?' · '+esc(o.info.addr):''}</small></span></button>
+        <div class="place-acts"><a class="btn-s ghost" href="${esc(placeUrl(o.name))}" target="_blank" rel="noopener">Bản đồ</a><a class="btn-s" href="${esc(placeDirUrl(o.name))}" target="_blank" rel="noopener">Chỉ đường</a></div></div>`; }).join('')
+      :'<div class="empty">Gõ “bún bò 50k @Bà Năm” khi ghi, hoặc chấm điểm sau bữa ăn để quán hiện ở đây.</div>'}
+  </section>
+  <section class="card" style="gap:10px"><div class="card-h"><h2>Món</h2><span class="lbl">${all.filter(m=>!m.hidden).length} món</span></div>
+    <input class="search" id="mq" type="search" placeholder="Tìm món hoặc quán…" value="${esc(menuQ)}" aria-label="Tìm trong menu">
+    <div class="filters" role="group" aria-label="Ẩm thực">${cuiOpts.map(([k,l])=>`<button class="pill" data-mcui="${k}" aria-pressed="${menuCui===k}">${l}</button>`).join('')}</div>
+    <div class="seg seg-s" role="group" aria-label="Sắp xếp" style="align-self:flex-start">${[['n','Hay ăn'],['score','Điểm cao'],['price','Rẻ']].map(([k,l])=>`<button data-msort="${k}" aria-pressed="${menuSort===k}">${l}</button>`).join('')}</div>
+    <div>${shown.length?shown.map(row).join(''):'<div class="empty">Chưa có món nào. Ghi một bữa ăn, ví dụ “phở 55k”, là món tự vào menu.</div>'}</div>
+    ${hid.length?`<details class="hid"><summary>${hid.length} món đã ẩn</summary>${hid.map(row).join('')}</details>`:''}
+  </section>`;
+}
+function openMenuItem(key){
+  const all=buildMenu(), m=all.find(x=>x.key===key)||{key:'',name:'',price:0,cui:'vn',place:'',hidden:false,n:0,manual:true};
+  const isNew=!m.key; let cui=m.cui==='uong'?'uong':m.cui;
+  const plist=placeList().map(o=>o.name);
+  openSheet(`${sheetHead(isNew?'Thêm món':'Món trong menu')}
+  ${isNew?'':`<div class="preview"><span class="dot" style="background:var(--peach)">${m.emoji}</span><div style="min-width:0"><div class="pa" style="font-size:22px">${esc(m.name)}</div>
+    <div class="pm num">${m.n?`Ăn ${m.n} lần · lần gần nhất ${dayLabel(m.last).toLowerCase()}`:'Món bạn tự thêm'}${m.score?` · ★ ${m.score.toFixed(1)}/10`:''}</div></div></div>`}
+  <label class="field">Tên món<input id="mn" value="${esc(m.name)}" placeholder="vd Bún bò Huế"></label>
+  <div class="row2"><label class="field">Giá thường (1 người)<input id="mp" inputmode="decimal" value="${m.price?fmt(m.price):''}" placeholder="vd 50k"></label>
+    <label class="field">Quán hay ăn<input id="mpl" list="mpll" value="${esc(m.place||'')}" placeholder="vd Bà Năm" autocomplete="off"></label></div>
+  <datalist id="mpll">${plist.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>
+  <div class="sec-l">Ẩm thực</div>
+  <div class="filters" id="mc">${[...Object.entries(CUISINES),['uong',{f:'🧋',n:'Đồ uống'}]].map(([k,v])=>`<button class="pill" data-mc="${k}" aria-pressed="${k===cui}">${v.f} ${v.n}</button>`).join('')}</div>
+  <div class="set-row"><div class="t"><b>Không gợi ý món này</b><small>Ẩn khỏi “Hôm nay ăn gì?”, lịch sử chi tiêu vẫn giữ</small></div><button class="switch" role="switch" id="mh" aria-checked="${m.hidden}" aria-label="Ẩn món"></button></div>
+  <div class="row2"><a class="secondary" style="text-align:center;text-decoration:none" href="${esc(mapsSearch((m.name||'quán ăn')+' gần đây'))}" target="_blank" rel="noopener">🔍 Tìm quán gần</a>
+    ${m.place?`<a class="secondary" style="text-align:center;text-decoration:none" href="${esc(placeUrl(m.place))}" target="_blank" rel="noopener">🗺️ Mở ${esc(m.place)}</a>`:'<span></span>'}</div>
+  <button class="primary" id="msave">Lưu</button>${!isNew&&m.manual?'<button class="danger" id="mdel">Xoá khỏi menu</button>':''}`);
+  document.getElementById('mc').onclick=e=>{ const b=e.target.closest('[data-mc]'); if(!b) return; cui=b.dataset.mc; document.querySelectorAll('[data-mc]').forEach(y=>y.setAttribute('aria-pressed',y.dataset.mc===cui)); };
+  const sw=document.getElementById('mh'); sw.onclick=()=>sw.setAttribute('aria-checked',sw.getAttribute('aria-checked')!=='true');
+  document.getElementById('msave').onclick=()=>{
+    const name=val('mn').trim(); if(!name){ toast('Cần tên món'); return; }
+    const k=isNew?norm(name):m.key, menu=S.settings.menu||(S.settings.menu={});
+    if(isNew && buildMenu().some(x=>x.key===k)){ toast('Món này đã có trong menu'); return; }
+    const prev=menu[k]||{}, e={...prev,hidden:sw.getAttribute('aria-checked')==='true'};
+    const setIf=(f,v,cur)=>{ if(isNew || v!==cur || prev[f]!==undefined) e[f]=v; };   // chỉ ghi đè trường bạn đã sửa, còn lại app tự tính
+    setIf('name',name,m.name); setIf('price',parseAmount(val('mp'))||0,m.price); setIf('cui',cui,m.cui); setIf('place',val('mpl').trim(),m.place||'');
+    menu[k]=e; saveSettings(); toast(isNew?'Đã thêm vào menu':'Đã lưu'); closeSheet();
+  };
+  const del=document.getElementById('mdel'); if(del) armDelete(del,()=>{ delete S.settings.menu[m.key]; saveSettings(); toast('Đã xoá'); closeSheet(); });
+}
+function openPlace(key){
+  const o=placeList().find(x=>x.key===key)||{key:'',name:'',info:{},dishes:{},n:0,avg:0};
+  const isNew=!o.key, info=o.info||{};
+  openSheet(`${sheetHead(isNew?'Thêm quán':esc(o.name))}
+  ${!isNew&&o.n?`<p class="lbl">★ ${o.avg.toFixed(1)}/10 qua ${o.n} lần chấm · ${esc(Object.keys(o.dishes).join(', '))}</p>`:''}
+  <label class="field">Tên quán<input id="pn" value="${esc(o.name)}" placeholder="vd Bún bò Bà Năm"></label>
+  <label class="field">Link Google Maps (không bắt buộc)<input id="pu" value="${esc(info.url||'')}" inputmode="url" placeholder="Dán link chia sẻ từ Google Maps"></label>
+  <p class="lbl">Trong Google Maps: mở quán → Chia sẻ → Sao chép đường liên kết, rồi dán vào đây.</p>
+  <label class="field">Địa chỉ / ghi chú<input id="pa" value="${esc(info.addr||'')}" placeholder="vd 123 Lê Lợi, Q.1 · đóng cửa thứ 2"></label>
+  <div class="row2"><a class="secondary" style="text-align:center;text-decoration:none" id="po" href="${esc(o.name?placeUrl(o.name):mapsSearch('quán ăn gần đây'))}" target="_blank" rel="noopener">🗺️ Bản đồ</a>
+    <a class="secondary" style="text-align:center;text-decoration:none" href="${esc(o.name?placeDirUrl(o.name):mapsSearch('quán ăn gần đây'))}" target="_blank" rel="noopener">🧭 Chỉ đường</a></div>
+  <button class="primary" id="psave">Lưu quán</button>${!isNew&&info.url!==undefined?'<button class="danger" id="pdel">Xoá link và ghi chú</button>':''}`);
+  const pu=document.getElementById('pu');
+  pu.addEventListener('input',()=>{ const nm=nameFromMapsUrl(pu.value); if(nm && !val('pn').trim()) document.getElementById('pn').value=nm; });
+  document.getElementById('psave').onclick=()=>{
+    let name=val('pn').trim(); const url=pu.value.trim(), addr=val('pa').trim();
+    if(!name) name=nameFromMapsUrl(url);
+    if(!name){ toast('Cần tên quán'); return; }
+    if(url && !isMapsUrl(url)){ toast('Link này không phải Google Maps',3000); return; }
+    const db=placesDb(); if(o.key && o.key!==norm(name)) delete db[o.key];
+    db[norm(name)]={name,url,addr}; saveSettings(); toast('Đã lưu quán'); closeSheet();
+  };
+  const del=document.getElementById('pdel'); if(del) armDelete(del,()=>{ delete placesDb()[o.key]; saveSettings(); toast('Đã xoá'); closeSheet(); });
+}
+
 /* ============ màn Kế hoạch ============ */
 let showPaid=false;
 function viewPlan(){
@@ -1132,7 +1300,9 @@ function viewSettings(){
         <label class="field">Thích ăn<input id="tl" value="${esc((S.settings.taste||{}).likes||'')}" placeholder="vd bún, đồ Hàn, cay"></label>
         <label class="field">Không ăn được<input id="ta" value="${esc((S.settings.taste||{}).avoid||'')}" placeholder="vd hành, hải sản, nội tạng"></label>
         <label class="field">Ghi chú cho AI<input id="tn" value="${esc((S.settings.taste||{}).note||'')}" placeholder="vd hạn chế đồ chiên, ít ngọt"></label>
-        <button class="primary" data-act="taste-save">Lưu khẩu vị</button></section>
+        <button class="primary" data-act="taste-save">Lưu khẩu vị</button>
+        <div class="set-row"><div class="t"><b>Gợi ý quán gần bạn</b><small>Khi bấm Hỏi AI, gửi vị trí gần đúng (khoảng 100 m) để AI tìm quán thật trên Google Maps. Không lưu lại.</small></div>
+          <button class="switch" role="switch" aria-checked="${!!store.get('hct_geo',false)}" aria-label="Gợi ý quán gần bạn" data-act="geo"></button></div></section>
       <section class="card"><div class="card-h"><h2>Bảo mật</h2></div>
         <div class="set-row" style="flex-wrap:wrap"><div class="t"><b>Khoá bằng Face ID</b><small>${canFace?'Đăng nhập một lần là đủ. Bật khoá nếu muốn người khác cầm máy không xem được.':'Trình duyệt này không hỗ trợ'}</small></div>
         <div class="seg seg-s" role="group" aria-label="Khi nào hỏi Face ID">${[['never','Tắt'],['1h','Sau 1 giờ'],['always','Mỗi lần mở']].map(([k,l])=>`<button data-face="${k}" aria-pressed="${faceWhen()===k}" ${canFace?'':'disabled'}>${l}</button>`).join('')}</div></div></section>
@@ -1368,7 +1538,7 @@ function makePot(wrap, data){
 }
 
 /* ============ điều hướng ============ */
-const ROUTES={'tong-quan':viewHome,'giao-dich':viewList,'bao-cao':viewReport,'ke-hoach':viewPlan,'cai-dat':viewSettings};
+const ROUTES={'tong-quan':viewHome,'giao-dich':viewList,'bao-cao':viewReport,'ke-hoach':viewPlan,'menu':viewMenu,'cai-dat':viewSettings};
 const current = () => { const h=location.hash.slice(1); return ROUTES[h]?h:'tong-quan'; };
 function render(){
   const r=current(), v=document.getElementById('view'), y=window.scrollY;
@@ -1379,6 +1549,8 @@ function render(){
   paintSync();
   const qi=document.getElementById('q');
   if(qi) qi.oninput=e=>{ q=e.target.value; const pos=e.target.selectionStart; render(); const n=document.getElementById('q'); n.focus(); n.setSelectionRange(pos,pos); };
+  const mq=document.getElementById('mq');
+  if(mq) mq.oninput=e=>{ menuQ=e.target.value; const pos=e.target.selectionStart; render(); const n=document.getElementById('mq'); n.focus(); n.setSelectionRange(pos,pos); };
   const lm=document.getElementById('lm'); if(lm) lm.onchange=e=>{ listMonth=e.target.value; render(); };
   const imp=document.getElementById('imp'); if(imp) imp.onchange=importFile;
   if(render._route===r) window.scrollTo(0,y); else window.scrollTo(0,0);
@@ -1471,6 +1643,7 @@ function openRate(id){
   <div class="sec-l">Ẩm thực</div>
   <div class="filters" id="rc">${Object.entries(CUISINES).map(([k,v])=>`<button class="pill" data-rc="${k}" aria-pressed="${k===cui}">${v.f} ${v.n}</button>`).join('')}</div>
   <label class="field">Nhận xét ngắn<input id="rv" value="${esc(r.review||'')}" maxlength="120" placeholder="vd nước dùng đậm, hơi mặn, phục vụ nhanh"></label>
+  <label class="field">Link Google Maps của quán (không bắt buộc)<input id="rmap" inputmode="url" value="${esc((r.place&&placeInfo(r.place)||{}).url||'')}" placeholder="Dán link chia sẻ từ Google Maps"></label>
   <p class="lbl">AI dùng điểm này để gợi ý quay lại quán ngon và tránh quán dở.</p>
   <button class="primary" id="rsave">Lưu đánh giá</button>${r.score?'<button class="danger" id="rdel">Xoá đánh giá</button>':''}`);
   document.getElementById('rs').onclick=e=>{ const b=e.target.closest('[data-sc]'); if(!b) return; score=+b.dataset.sc;
@@ -1479,6 +1652,9 @@ function openRate(id){
     document.querySelectorAll('[data-rc]').forEach(y=>y.setAttribute('aria-pressed',y.dataset.rc===cui)); };
   document.getElementById('rsave').onclick=()=>{
     if(!score){ toast('Chọn điểm từ 1 đến 10'); return; }
+    const murl=val('rmap').trim(); if(murl && !isMapsUrl(murl)){ toast('Link này không phải Google Maps',3000); return; }
+    if(murl && !val('rp').trim()) document.getElementById('rp').value=nameFromMapsUrl(murl);
+    if(murl && val('rp').trim()){ const nm=val('rp').trim(); placesDb()[norm(nm)]={...(placeInfo(nm)||{}),name:nm,url:murl}; }
     reviews()[id]={place:val('rp').trim().slice(0,60),score,cuisine:cui,review:val('rv').trim().slice(0,120),dish:x.note,date:x.date,amount:x.amount,who:whoOf(x)};
     saveSettings(); toast('Đã lưu '+score+'/10'+(val('rp').trim()?' cho '+val('rp').trim():'')); closeSheet();
   };
@@ -1796,8 +1972,13 @@ document.addEventListener('click',async e=>{
     const c=store.get(eatKey(),null); if(c && c.reroll===eat.reroll && aiAvail && mode==='cloud'){ askAI(); return; }
     eat.reroll++; render(); return; }
   const pick=t.closest('[data-eatpick]'); if(pick){ const d=eatItems()[+pick.dataset.eatpick]; if(d){
+    if(d.quan && d.map_url && !placeInfo(d.quan)){ placesDb()[norm(d.quan)]={name:d.quan,url:d.map_url}; saveSettings(); }
     const total=d.gia*(eat.group==='hai'?2:1), amt=total%1000===0?(total/1000)+'k':String(total);
     openAdd(`${d.ten} ${amt}${d.quan?' @'+d.quan:''}`,'an'); } return; }
+  const mn=t.closest('[data-menu]'); if(mn){ openMenuItem(mn.dataset.menu); return; }
+  const pl=t.closest('[data-place]'); if(pl){ openPlace(pl.dataset.place); return; }
+  const mc=t.closest('[data-mcui]'); if(mc){ menuCui=mc.dataset.mcui; render(); return; }
+  const ms=t.closest('[data-msort]'); if(ms){ menuSort=ms.dataset.msort; render(); return; }
   const ec=t.closest('[data-eatcui]'); if(ec){ eat.cui=ec.dataset.eatcui; eat.reroll=(store.get(eatKey(),null)||{}).reroll||0; render(); return; }
   const rt=t.closest('[data-rate]'); if(rt){ openRate(rt.dataset.rate); return; }
   const rs=t.closest('[data-rateskip]'); if(rs){ const id=rs.dataset.rateskip; reviews()[id]={...(reviews()[id]||{}),skip:true}; saveSettings(); render(); return; }
@@ -1840,6 +2021,12 @@ document.addEventListener('click',async e=>{
     case 'ppl-save': S.settings.people=readPeople(); saveSettings(); toast('Đã lưu'); render(); break;
     case 'refresh': hardRefresh(); break;
     case 'upd-later': document.getElementById('upd').hidden=true; break;
+    case 'menu-add': openMenuItem(''); break;
+    case 'place-add': openPlace(''); break;
+    case 'geo': { const on=!store.get('hct_geo',false);
+      if(on && navigator.geolocation){ navigator.geolocation.getCurrentPosition(()=>{ store.set('hct_geo',true); toast('Đã bật: AI gợi ý quán gần bạn'); render(); },
+        ()=>{ toast('Chưa được phép dùng vị trí. Vào Cài đặt iPhone → Safari → Vị trí để cho phép.',4500); },{timeout:8000}); return; }
+      store.set('hct_geo',false); toast('Đã tắt dùng vị trí'); render(); break; }
     case 'taste-save': S.settings.taste={likes:val('tl').trim(),avoid:val('ta').trim(),note:val('tn').trim()}; saveSettings(); toast('Đã lưu khẩu vị'); render(); break;
     case 'cat-save': S.settings.cats=readCatEdits(); if(!S.settings.cats.some(c=>c.id==='khac')) S.settings.cats.push({...DEFAULT_CATS[8]}); saveSettings(); toast('Đã lưu danh mục'); render(); break;
   }

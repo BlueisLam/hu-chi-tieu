@@ -82,6 +82,14 @@ Sau khi thêm biến: Deployments → bản mới nhất → **Retry deployment*
 
 Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.mjs`
 
+## Menu của tôi + Google Maps
+
+- Trang **Menu của tôi** (`#menu`, mở từ nút 📖 Menu trong thẻ "Hôm nay ăn gì?" hoặc thanh bên trái trên máy tính): tự tổng hợp từ các khoản Ăn uống, gồm số lần ăn, giá trung bình, bữa hay ăn, quán và điểm. Sửa giá, ẩm thực, quán; **ẩn** món để không được gợi ý; tự thêm món.
+- **Quán quen**: dán link chia sẻ Google Maps của quán (khi chấm điểm hoặc trong trang quán). Có nút Bản đồ và Chỉ đường; quán chưa có link thì mở trang tìm kiếm Google Maps.
+- Gợi ý nhanh trộn món quen với món có sẵn, xoay vòng giữa các lần "Đổi món khác". Mỗi món có link "Tìm quán gần đây" hoặc "Xem quán".
+- **Gợi ý quán gần bạn** (Cài đặt → Khẩu vị): khi bấm Hỏi AI, app gửi vị trí làm tròn khoảng 100 m, Gemini dùng Google Maps để chọn quán có thật trong khoảng 3 km, kèm link quán. Nếu tính năng Google Maps của Gemini lỗi, app tự gợi ý như thường. Dùng chung `GEMINI_API_KEY`, không cần key Google Maps riêng.
+- Dữ liệu lưu trong `hct_settings.data` (`menu`, `places`) nên không cần thêm cột Supabase.
+
 ## Phát triển tiếp
 
 - Sửa `index.html` → commit → push → Cloudflare tự deploy.

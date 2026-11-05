@@ -25,7 +25,7 @@ function geminiKeys(env) {
 const providers = env => String(env.AI_PROVIDERS || 'gemini,groq').split(',').map(s => s.trim().toLowerCase())
   .filter((p, i, a) => a.indexOf(p) === i && (p === 'gemini' ? geminiKeys(env).length : p === 'groq' ? !!env.GROQ_API_KEY : false));
 
-async function callGemini(env, prompt) {
+async function callGemini(env, prompt, geo) {
   const models = [env.GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest'].filter((m, i, a) => m && a.indexOf(m) === i);
   const keys = geminiKeys(env).sort(() => Math.random() - 0.5);
   let last = 'Gemini không phản hồi';
@@ -36,8 +36,13 @@ async function callGemini(env, prompt) {
       try {
         r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent', {
           method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.9, maxOutputTokens: 4000, responseMimeType: 'application/json' } }),
+          body: JSON.stringify(geo
+            ? { contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                tools: [{ googleMaps: {} }],   // Gemini tra Google Maps để chọn quán có thật gần người dùng
+                toolConfig: { retrievalConfig: { latLng: { latitude: geo.lat, longitude: geo.lng } } },
+                generationConfig: { temperature: 0.7, maxOutputTokens: 4000 } }
+            : { contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.9, maxOutputTokens: 4000, responseMimeType: 'application/json' } }),
           signal: AbortSignal.timeout(20000),
         });
         raw = await r.text();
@@ -45,10 +50,13 @@ async function callGemini(env, prompt) {
       if (r.ok) {
         let c; try { c = (JSON.parse(raw).candidates || [])[0]; } catch { c = null; }
         const out = c && c.content && (c.content.parts || []).map(p => p.text || '').join('');
-        if (out) return out;
+        const places = ((c && c.groundingMetadata && c.groundingMetadata.groundingChunks) || [])
+          .map(g => g && g.maps).filter(m => m && m.uri).map(m => ({ title: clip(m.title, 80), uri: clip(m.uri, 300) }));
+        if (out) return { text: out, places };
         last = 'Gemini trả về rỗng'; continue;
       }
       last = 'Gemini ' + r.status + ': ' + raw.slice(0, 160);
+      if (geo && r.status === 400 && !/API[_ ]KEY/i.test(raw)) throw new Error('Google Maps grounding chưa dùng được: ' + raw.slice(0, 120));
       if (r.status === 404 || (r.status === 400 && /model/i.test(raw) && !/API[_ ]KEY/i.test(raw))) { modelDead = true; break; }
       // 429 hết hạn mức, 401/403 key sai, 5xx quá tải: thử key kế
     }
@@ -95,6 +103,9 @@ function buildPrompt(q) {
   if (q.stats) lines.push('Ẩm thực đã ăn 7 ngày qua (số bữa): ' + q.stats + '.');
   if (q.cuisine) lines.push('Người dùng muốn ăn: ' + q.cuisine + '. Cả 3 lựa chọn phải thuộc đúng loại này' + (/đồ nước/.test(q.cuisine) ? ' (món Việt có nước dùng: phở, bún, hủ tiếu, bánh canh, cháo, miến, lẩu...)' : /cơm, khô/.test(q.cuisine) ? ' (món Việt dạng cơm hoặc khô, không có nước dùng)' : '') + '.');
   else lines.push('Không chỉ định ẩm thực: dựa vào thống kê, nếu dạo này ăn lệch một kiểu thì gợi ý ít nhất một món thuộc ẩm thực khác (Hàn, Nhật, Thái, Trung, Âu Mỹ hoặc Việt kiểu khác).');
+  if (q.favorites.length) lines.push('Món người dùng hay ăn (có thể gợi ý lại nếu lâu chưa ăn): ' + q.favorites.join('; ') + '.');
+  if (q.hidden.length) lines.push('Người dùng đã ẩn, KHÔNG gợi ý: ' + q.hidden.join(', ') + '.');
+  if (q.geo) lines.push('Bạn có công cụ Google Maps và vị trí hiện tại của người dùng. Với mỗi lựa chọn đi quán hoặc giao hàng, hãy chọn một quán CÓ THẬT trên Google Maps, đang hoạt động, cách khoảng 3 km trở lại, đánh giá tốt; ghi đúng tên quán như trên Google Maps vào "quan" và khoảng cách ước tính vào "xa" (vd "800 m", "2,1 km"). Không bịa quán.');
   if (q.good.length) lines.push('Món/quán người dùng đã chấm điểm cao (có thể gợi ý QUAY LẠI một quán phù hợp, khi đó ghi đúng tên quán vào "quan"): ' + q.good.join('; ') + '.');
   if (q.bad.length) lines.push('Món/quán bị chấm điểm thấp, KHÔNG gợi ý lại quán này và cân nhắc tránh kiểu món đó: ' + q.bad.join('; ') + '.');
   lines.push(
@@ -107,20 +118,26 @@ function buildPrompt(q) {
     '- "loi_khuyen": một câu ngắn tối đa 20 từ về chuyện ăn uống/chi tiêu dựa trên dữ liệu ở trên, giọng thân thiện, không phán xét.',
     '',
     'Chỉ trả về JSON đúng mẫu, không thêm chữ nào khác:',
-    '{"goi_y":[{"ten":"Bún bò Huế","emoji":"🍜","gia":45000,"cach":"quán","quoc_gia":"Việt","quan":"","ly_do":"..."}],"loi_khuyen":"..."}',
+    '{"goi_y":[{"ten":"Bún bò Huế","emoji":"🍜","gia":45000,"cach":"quán","quoc_gia":"Việt","quan":"","xa":"","ly_do":"..."}],"loi_khuyen":"..."}',
     '"cach" là một trong: "quán", "giao hàng", "tự nấu". "quoc_gia" là một trong: "Việt", "Hàn", "Nhật", "Thái", "Trung", "Âu Mỹ", "Khác".',
-    '"quan" chỉ điền khi gợi ý quay lại đúng một quán trong danh sách đã chấm điểm cao, còn lại để "". "emoji" là đúng một emoji món ăn.'
+    (q.geo ? '"quan": tên quán thật trên Google Maps (hoặc quán đã chấm điểm cao); "xa": khoảng cách, để "" nếu tự nấu.' : '"quan" chỉ điền khi gợi ý quay lại đúng một quán trong danh sách đã chấm điểm cao, còn lại để ""; "xa" để "".') + ' "emoji" là đúng một emoji món ăn.'
   );
   return lines.join('\n');
 }
 
-function shape(out) {
+function shape(out, places) {
   const arr = Array.isArray(out && out.goi_y) ? out.goi_y : [];
   const items = arr.slice(0, 3).map(x => ({
     ten: clip(x.ten, 60), emoji: clip(x.emoji, 8) || '🍽️', gia: num(x.gia, 0, 2000000, 0),
     cach: ['quán', 'giao hàng', 'tự nấu'].includes(x.cach) ? x.cach : 'quán', ly_do: clip(x.ly_do, 140),
-    cui: CUI_CODE[clip(x.quoc_gia, 20)] || '', quan: clip(x.quan, 60),
+    cui: CUI_CODE[clip(x.quoc_gia, 20)] || '', quan: clip(x.quan, 60), xa: clip(x.xa, 20),
   })).filter(x => x.ten);
+  const nm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, ' ').trim();
+  for (const it of items) {   // gắn link Google Maps của quán nếu AI đã tra được
+    if (!it.quan || !places || !places.length) continue;
+    const q = nm(it.quan), hit = places.find(p => nm(p.title) === q) || places.find(p => nm(p.title).includes(q) || q.includes(nm(p.title)));
+    if (hit) it.map_url = hit.uri;
+  }
   if (!items.length) throw new Error('AI không đưa ra món nào');
   return { items, tip: clip(out.loi_khuyen, 160) };
 }
@@ -153,12 +170,22 @@ export async function onRequestPost({ request, env }) {
     likes: clip(body.likes, 200), avoid: clip(body.avoid, 200), note: clip(body.note, 200),
     cuisine: clip(body.cuisine, 40), stats: clip(body.cuisineStats, 200),
     good: list(body.good, 10, 160), bad: list(body.bad, 8, 160),
+    favorites: list(body.favorites, 10, 120), hidden: list(body.hidden, 20, 60),
+    geo: (() => { const lat = Number(body.lat), lng = Number(body.lng);
+      return isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng) ? { lat: Math.round(lat * 1000) / 1000, lng: Math.round(lng * 1000) / 1000 } : null; })(),
   };
-  const prompt = buildPrompt(q);
   const errs = [];
   for (const p of order) {
     try {
-      const text = p === 'gemini' ? await callGemini(env, prompt) : await callGroq(env, prompt);
+      if (p === 'gemini') {
+        if (q.geo) {
+          try { const g = await callGemini(env, buildPrompt(q), q.geo); return json({ ...shape(extractJson(g.text), g.places), provider: 'gemini', maps: true }); }
+          catch (e) { errs.push('gemini+maps: ' + (e && e.message || e)); }
+        }
+        const g = await callGemini(env, buildPrompt({ ...q, geo: null }), null);
+        return json({ ...shape(extractJson(g.text), g.places), provider: 'gemini' });
+      }
+      const text = await callGroq(env, buildPrompt({ ...q, geo: null }));
       return json({ ...shape(extractJson(text)), provider: p });
     } catch (e) { errs.push(p + ': ' + (e && e.message || e)); }
   }
