@@ -292,7 +292,7 @@ textarea{width:100%;min-height:90px;border-radius:14px;border:1.5px solid var(--
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const CONFIG = { SUPABASE_URL: '', SUPABASE_ANON_KEY: '' };
+const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
 const BAR = {peach:'#F6A77F',sky:'#7DB8E3',butter:'#E8C45A',rose:'#EE7FA0',lilac:'#A890E6',mint:'#6CC4A4',sunk:'#B9A6BC'};
@@ -315,7 +315,8 @@ const KEYWORDS = {
   gia:['gui me','cho me','gui ba','cho ba','bieu','qua','sinh nhat','dam cuoi','dam gio','hieu hi','mung cuoi','li xi']
 };
 const WALLET_CK = ['chuyen khoan','zalo pay','zalopay','banking','momo','vnpay','visa','the','ck','qr'];
-const TABLE = {tx:'transactions',recurring:'recurring',jars:'jars',debts:'debts'};
+const TABLE = {tx:'hct_transactions',recurring:'hct_recurring',jars:'hct_jars',debts:'hct_debts'};
+const SETTINGS_TABLE = 'hct_settings';
 const LS = {data:'hct_v2',q:'hct_q',cfg:'hct_cfg',face:'hct_faceid',owner:'hct_owner'};
 
 /* ============ tiện ích ============ */
@@ -392,7 +393,7 @@ async function flush(){
       const dels = snap.filter(o=>o.k===k&&o.op==='del').map(o=>o.id);
       if(dels.length){ const {error}=await sb.from(TABLE[k]).delete().in('id',dels); if(error) throw error; }
     }
-    if(snap.some(o=>o.k==='settings')){ const {error}=await sb.from('settings').upsert({user_id:user.id,data:S.settings,updated_at:new Date().toISOString()}); if(error) throw error; }
+    if(snap.some(o=>o.k==='settings')){ const {error}=await sb.from(SETTINGS_TABLE).upsert({user_id:user.id,data:S.settings,updated_at:new Date().toISOString()}); if(error) throw error; }
     Q = Q.filter(o=>!snap.includes(o)); store.set(LS.q,Q); syncErr=''; lastSync=new Date();
   }catch(e){ syncErr = e.message||String(e); }
   flushing=false; paintSync();
@@ -413,7 +414,7 @@ async function pull(){
   const ok = await flush(); if(!ok) return;
   try{
     const [tx,rc,jr,db] = await Promise.all(Object.values(TABLE).map(fetchAll));
-    const st = await sb.from('settings').select('data').eq('user_id',user.id).maybeSingle();
+    const st = await sb.from(SETTINGS_TABLE).select('data').eq('user_id',user.id).maybeSingle();
     if(st.error) throw st.error;
     if(Q.length) return; // có thay đổi mới trong lúc tải, để lần sau
     S.tx=tx.map(clean); S.recurring=rc.map(clean); S.jars=jr.map(clean); S.debts=db.map(clean);
@@ -757,14 +758,14 @@ function viewPlan(){
 
 /* ============ màn Cài đặt ============ */
 function viewSettings(){
-  const cfg=getCfg(), face=store.get(LS.face,null), canFace=!!(window.PublicKeyCredential&&navigator.credentials);
+  const cfg=(store.get(LS.cfg,{}).off?{url:'',key:''}:getCfg()), face=store.get(LS.face,null), canFace=!!(window.PublicKeyCredential&&navigator.credentials);
   const cloud = mode==='cloud' ? `
     <div class="set-row"><div class="t"><b>Tài khoản</b><small>${esc(user?user.email:'')}</small></div><span class="sync" data-sync><i></i><span>…</span></span></div>
     ${syncErr?`<p class="err">Lỗi gần nhất: ${esc(syncErr)}</p>`:''}
     <div class="set-row"><div class="t"><b>Đồng bộ ngay</b><small>${lastSync?'Lần cuối '+lastSync.toLocaleTimeString('vi-VN'):'Tự đồng bộ khi mở app và khi có mạng'}</small></div><button class="btn-s" data-act="sync-now">Đồng bộ</button></div>
     <div class="set-row"><div class="t"><b>Đăng xuất</b><small>Xoá bản sao trên máy này, dữ liệu vẫn còn trên cloud</small></div><button class="btn-s ghost" data-act="logout">Đăng xuất</button></div>
     <div class="set-row"><div class="t"><b>Ngắt kết nối Supabase</b><small>Quay về chế độ chỉ trên máy</small></div><button class="btn-s ghost" data-act="cfg-clear">Ngắt</button></div>` : `
-    <p class="lbl">Đang lưu <b>chỉ trên máy này</b>. Dán 2 thông tin trong Supabase → Project Settings → API để đồng bộ giữa iPhone và máy tính.</p>
+    <p class="lbl">Đang lưu <b>chỉ trên máy này</b>. Bấm Kết nối để đồng bộ giữa iPhone và máy tính. Ô trống thì dùng project mặc định.</p>
     <label class="field">Project URL<input id="cfg-url" placeholder="https://xxxx.supabase.co" value="${esc(cfg.url)}" autocomplete="off"></label>
     <label class="field">anon public key<input id="cfg-key" placeholder="eyJhbGciOi…" value="${esc(cfg.key)}" autocomplete="off"></label>
     ${!window.supabase?'<p class="err">Không tải được thư viện Supabase ở trang này. Hãy dùng bản đã deploy lên Netlify.</p>':''}
@@ -983,7 +984,7 @@ function openDebt(id){
 }
 
 /* ============ cài đặt: hành động ============ */
-function getCfg(){ const s=store.get(LS.cfg,{}); return {url:s.url||CONFIG.SUPABASE_URL||'',key:s.key||CONFIG.SUPABASE_ANON_KEY||''}; }
+function getCfg(){ const s=store.get(LS.cfg,{}); if(s.off) return {url:'',key:''}; return {url:s.url||CONFIG.SUPABASE_URL||'',key:s.key||CONFIG.SUPABASE_ANON_KEY||''}; }
 function readCatEdits(){
   return [...document.querySelectorAll('#catlist .catedit')].map(r=>{ const old=cats().find(c=>c.id===r.dataset.cid)||{};
     return {id:r.dataset.cid,icon:r.querySelector('.emo').value.trim()||'✨',name:r.querySelector('.cn').value.trim()||'Không tên',color:(r.querySelector('[data-sw][aria-pressed="true"]')||{}).dataset?.sw||old.color||'sunk'}; });
@@ -1043,37 +1044,79 @@ document.addEventListener('visibilitychange',()=>{
   if(mode==='cloud'&&user) pull();
 });
 
-/* ============ đăng nhập bằng mã email ============ */
-function showLogin(msg){
+/* ============ đăng nhập bằng email + mật khẩu ============ */
+const appUrl = () => location.origin + location.pathname;
+const authMsg = m => /invalid login/i.test(m)?'Sai email hoặc mật khẩu.'
+  : /not confirmed/i.test(m)?'Email chưa được xác nhận. Mở hộp thư, bấm link xác nhận rồi đăng nhập lại.'
+  : /already registered|already exists/i.test(m)?'Email này đã có tài khoản. Chuyển sang Đăng nhập.'
+  : /rate limit|too many/i.test(m)?'Gửi quá nhiều lần. Đợi vài phút rồi thử lại.'
+  : /at least|weak|password should/i.test(m)?'Mật khẩu cần ít nhất 6 ký tự.'
+  : /signups? not allowed|signup is disabled/i.test(m)?'Project Supabase đang tắt đăng ký tài khoản mới.'
+  : m;
+function showLogin(msg, tab){
+  tab = tab || 'in';
   gate.hidden=false;
+  const T={in:['Đăng nhập','Đăng nhập'],up:['Tạo tài khoản','Tạo tài khoản'],reset:['Quên mật khẩu','Gửi link đặt lại']};
   gate.innerHTML=`<div class="gate-card"><div class="jar">H</div><h2>Hũ Chi Tiêu</h2>
-    <p class="lbl">Nhập email, app gửi mã 6 số để đăng nhập. Không cần mật khẩu.</p>
+    ${tab==='reset'?'<p class="lbl">Nhập email, app gửi link để đặt mật khẩu mới.</p>':
+      `<div class="seg" role="group" aria-label="Chọn" style="align-self:center"><button data-lt="in" aria-pressed="${tab==='in'}">Đăng nhập</button><button data-lt="up" aria-pressed="${tab==='up'}">Tạo tài khoản</button></div>`}
     <label class="field">Email<input id="lg-email" type="email" autocomplete="email" inputmode="email" placeholder="ban@gmail.com"></label>
-    <button class="primary" id="lg-send">Gửi mã</button>
-    <div id="lg-step2" hidden style="display:flex;flex-direction:column;gap:14px">
-      <label class="field">Mã trong email<input id="lg-code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="······"></label>
-      <button class="primary" id="lg-verify">Đăng nhập</button></div>
+    ${tab==='reset'?'':`<label class="field">Mật khẩu<input id="lg-pw" type="password" autocomplete="${tab==='up'?'new-password':'current-password'}" placeholder="Ít nhất 6 ký tự"></label>`}
+    <button class="primary" id="lg-go">${T[tab][1]}</button>
     <p class="err" id="lg-err" ${msg?'':'hidden'}>${esc(msg||'')}</p>
-    <button class="lnk" id="lg-cfg">Đổi cấu hình Supabase</button></div>`;
+    <p class="lbl" id="lg-ok" hidden></p>
+    ${tab==='in'?'<button class="lnk" data-lt="reset">Quên mật khẩu?</button>':tab==='reset'?'<button class="lnk" data-lt="in">Quay lại đăng nhập</button>':''}
+    <button class="lnk" id="lg-cfg">Dùng project Supabase khác</button></div>`;
   const err=t=>{ const e=document.getElementById('lg-err'); e.hidden=!t; e.textContent=t||''; };
+  const ok=t=>{ const e=document.getElementById('lg-ok'); e.hidden=!t; e.textContent=t||''; };
   const emailEl=document.getElementById('lg-email'); emailEl.value=store.get('hct_email','');
-  document.getElementById('lg-send').onclick=async e=>{
-    const email=emailEl.value.trim(); if(!/^\S+@\S+\.\S+$/.test(email)){ err('Email chưa đúng định dạng'); return; }
-    e.target.disabled=true; e.target.textContent='Đang gửi…'; err('');
-    const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
-    e.target.disabled=false; e.target.textContent='Gửi lại mã';
-    if(error){ err('Không gửi được: '+error.message); return; }
-    store.set('hct_email',email); document.getElementById('lg-step2').hidden=false; document.getElementById('lg-code').focus();
+  gate.querySelectorAll('[data-lt]').forEach(b=>b.onclick=()=>showLogin('',b.dataset.lt));
+  const go=document.getElementById('lg-go');
+  const submit=async()=>{
+    const email=emailEl.value.trim(), pwEl=document.getElementById('lg-pw'), password=pwEl?pwEl.value:'';
+    if(!/^\S+@\S+\.\S+$/.test(email)){ err('Email chưa đúng định dạng'); return; }
+    if(tab!=='reset' && password.length<6){ err('Mật khẩu cần ít nhất 6 ký tự'); return; }
+    go.disabled=true; err(''); ok(''); store.set('hct_email',email);
+    try{
+      if(tab==='in'){
+        const {data,error}=await sb.auth.signInWithPassword({email,password});
+        if(error) throw error;
+        gate.hidden=true; gate.innerHTML=''; await onLogin(data.user,true); return;
+      }
+      if(tab==='up'){
+        const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:appUrl()}});
+        if(error) throw error;
+        if(data.session){ gate.hidden=true; gate.innerHTML=''; await onLogin(data.user,true); return; }
+        if(data.user && data.user.identities && !data.user.identities.length) throw new Error('already registered');
+        showLogin('', 'in');
+        const o=document.getElementById('lg-ok'); o.hidden=false;
+        o.textContent='Đã gửi email xác nhận tới '+email+'. Bấm link trong email (mở ở đâu cũng được), rồi quay lại đây đăng nhập.';
+        return;
+      }
+      const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:appUrl()});
+      if(error) throw error;
+      ok('Đã gửi link tới '+email+'. Mở link trên máy này để đặt mật khẩu mới.');
+    }catch(e){ err(authMsg(e.message||String(e))); }
+    go.disabled=false;
   };
-  document.getElementById('lg-verify').onclick=async e=>{
-    const token=val('lg-code').replace(/\D/g,''); if(token.length<6){ err('Mã gồm 6 số'); return; }
-    e.target.disabled=true; err('');
-    const {data,error}=await sb.auth.verifyOtp({email:emailEl.value.trim(),token,type:'email'});
+  go.onclick=submit;
+  gate.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } }));
+  document.getElementById('lg-cfg').onclick=()=>{ store.set(LS.cfg,{off:true}); location.hash='#cai-dat'; location.reload(); };
+}
+function showNewPassword(){
+  gate.hidden=false;
+  gate.innerHTML=`<div class="gate-card"><div class="jar">H</div><h2>Đặt mật khẩu mới</h2>
+    <label class="field">Mật khẩu mới<input id="np" type="password" autocomplete="new-password" placeholder="Ít nhất 6 ký tự"></label>
+    <button class="primary" id="np-go">Lưu mật khẩu</button><p class="err" id="np-err" hidden></p></div>`;
+  document.getElementById('np-go').onclick=async e=>{
+    const p=val('np'), er=document.getElementById('np-err');
+    if(p.length<6){ er.hidden=false; er.textContent='Mật khẩu cần ít nhất 6 ký tự'; return; }
+    e.target.disabled=true;
+    const {data,error}=await sb.auth.updateUser({password:p});
     e.target.disabled=false;
-    if(error){ err('Mã sai hoặc đã hết hạn. Bấm Gửi lại mã.'); return; }
-    gate.hidden=true; gate.innerHTML=''; await onLogin(data.user, true);
+    if(error){ er.hidden=false; er.textContent=authMsg(error.message); return; }
+    gate.hidden=true; gate.innerHTML=''; toast('Đã đổi mật khẩu'); await onLogin(data.user,false);
   };
-  document.getElementById('lg-cfg').onclick=()=>{ store.del(LS.cfg); location.hash='#cai-dat'; location.reload(); };
 }
 async function onLogin(u, fresh){
   user=u;
@@ -1134,8 +1177,9 @@ document.addEventListener('click',async e=>{
     case 'toggle-paid': showPaid=!showPaid; render(); break;
     case 'sync-now': await pull(); toast(syncErr?'Lỗi: '+syncErr:'Đã đồng bộ'); render(); break;
     case 'logout': if(Q.length && !A.classList.contains('armed')){ A.classList.add('armed'); A.textContent='Còn '+Q.length+' thay đổi chưa đồng bộ. Bấm lần nữa'; return; } logout(true); break;
-    case 'cfg-clear': store.del(LS.cfg); store.del(LS.owner); store.del(LS.q); location.reload(); break;
+    case 'cfg-clear': store.set(LS.cfg,{off:true}); store.del(LS.owner); store.del(LS.q); location.reload(); break;
     case 'cfg-save': { const url=val('cfg-url').trim().replace(/\/+$/,''), key=val('cfg-key').trim();
+      if(!url && !key && CONFIG.SUPABASE_URL){ store.del(LS.cfg); location.hash='#tong-quan'; location.reload(); return; }
       if(!/^https:\/\/.+/.test(url)||key.length<20){ toast('Kiểm tra lại URL và key',3000); return; }
       store.set(LS.cfg,{url,key}); location.hash='#tong-quan'; location.reload(); break; }
     case 'face': { const on=A.getAttribute('aria-checked')==='true';
@@ -1150,6 +1194,8 @@ document.addEventListener('click',async e=>{
 });
 
 /* ============ khởi động ============ */
+const isRecovery = /type=recovery/.test(location.hash);
+if(/access_token=|error_description=/.test(location.hash)) window.__authHash = location.hash;
 async function boot(){
   const cfg=getCfg();
   if(cfg.url&&cfg.key&&window.supabase){
@@ -1164,6 +1210,10 @@ async function boot(){
   render(); paintSync();
   let session=null;
   try{ session=(await sb.auth.getSession()).data.session; }catch(e){}
+  if(/access_token=|error_description=/.test(location.hash)) history.replaceState(null,'',location.pathname+'#tong-quan');
+  if(isRecovery && session){ showNewPassword(); return; }
+  const authErr = (window.__authHash||'').match(/error_description=([^&]+)/);
+  if(!session && authErr){ showLogin('Link không dùng được: '+decodeURIComponent(authErr[1].replace(/\+/g,' '))+'. Thử lại.'); return; }
   if(!session){
     if(!navigator.onLine && store.get(LS.owner,null)){ syncErr='Ngoại tuyến'; runRecurring(); render(); showLock(); return; }
     showLogin(); return;

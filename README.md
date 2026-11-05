@@ -22,41 +22,28 @@ supabase/schema.sql    tạo bảng + phân quyền trên Supabase
 
 ## Cài đặt từ đầu
 
-### 1. Supabase
+### 1. Supabase (đã cài sẵn)
 
-1. https://supabase.com → **New project** (region Singapore).
-2. **SQL Editor** → dán toàn bộ `supabase/schema.sql` → **Run**.
-3. **Authentication → Email Templates → Magic Link**, thay nội dung bằng:
-   ```html
-   <h2>Mã đăng nhập Hũ Chi Tiêu</h2>
-   <p>Mã của bạn: <b style="font-size:24px">{{ .Token }}</b></p>
-   ```
-   App đăng nhập bằng mã 6 số thay vì link, vì trên iPhone, app ở màn hình chính không dùng chung đăng nhập với Safari.
-4. **Project Settings → API**: chép **Project URL** và **anon public key**.
+App dùng chung project **luna-cosmetics**, mọi bảng đều có tiền tố `hct_` nên không đụng dữ liệu shop. URL và anon key đã điền sẵn trong `CONFIG` ở đầu phần script của `index.html`. Anon key được phép công khai, vì dữ liệu đã được bảo vệ bằng Row Level Security: mỗi tài khoản chỉ đọc và ghi được dữ liệu của chính mình.
+
+Muốn dựng lại trên project khác: chạy `supabase/schema.sql` trong SQL Editor, rồi đổi `CONFIG`.
+
+**Tạo tài khoản đăng nhập:** project đang tắt đăng ký công khai (để bảo vệ shop), nên tạo tài khoản trong dashboard:
+Authentication → Users → **Add user → Create new user** → nhập email và mật khẩu → tick **Auto Confirm User** → Create.
 
 ### 2. Netlify (tự deploy mỗi lần push)
 
-1. https://app.netlify.com → **Add new site → Import an existing project → GitHub** → chọn repo `hu-chi-tieu`.
-2. Để trống Build command; **Publish directory** để `.` → **Deploy**.
-3. **Site configuration → Change site name** → ví dụ `hu-chi-tieu-lam`.
-4. Quay lại Supabase → **Authentication → URL Configuration** → điền link Netlify vào **Site URL**.
+Site đã được nối với repo này. Mỗi lần push lên `main`, Netlify tự deploy lại sau khoảng 30 giây.
 
-Từ giờ, mỗi lần push lên nhánh `main`, Netlify tự deploy lại.
+### 3. Đăng nhập
 
-### 3. Gắn Supabase vào app
-
-Cách 1: mở app → **Cài đặt → Kết nối cloud** → dán URL và key. Phải làm riêng trên từng máy hoặc trình duyệt.
-
-Cách 2 (khuyên dùng): điền một lần vào `index.html`, rồi commit và push:
-```js
-const CONFIG = { SUPABASE_URL: 'https://xxxx.supabase.co', SUPABASE_ANON_KEY: 'eyJ...' };
-```
-Anon key được phép công khai, vì dữ liệu đã được bảo vệ bằng Row Level Security trong `schema.sql`: mỗi tài khoản chỉ đọc và ghi được dữ liệu của chính mình.
+Mở link Netlify → **Đăng nhập** bằng email và mật khẩu vừa tạo. Dữ liệu tự đồng bộ giữa các máy.
+"Quên mật khẩu?" sẽ gửi link đặt lại tới email, nhớ mở link đó trên cùng máy.
 
 ### 4. iPhone
 
 1. Mở link Netlify bằng **Safari** → **Chia sẻ → Thêm vào MH chính**.
-2. Mở app từ icon → đăng nhập bằng mã email → **Cài đặt → Khoá bằng Face ID**.
+2. Mở app từ icon → đăng nhập bằng email + mật khẩu → **Cài đặt → Khoá bằng Face ID**.
 3. Back Tap: app **Phím tắt** → tạo phím tắt **Mở URL** `https://<site>.netlify.app/#nhap` → **Cài đặt → Trợ năng → Cảm ứng → Chạm vào mặt sau → Chạm hai lần** → chọn phím tắt đó.
    Phím tắt sẽ mở Safari, nên cần đăng nhập trong Safari một lần nữa.
 

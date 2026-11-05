@@ -1,6 +1,7 @@
 -- Hũ Chi Tiêu: dán toàn bộ file này vào Supabase → SQL Editor → Run
+-- Tất cả bảng có tiền tố hct_ để dùng chung project với app khác mà không đụng nhau.
 
-create table if not exists public.transactions (
+create table if not exists public.hct_transactions (
   id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   date date not null,
@@ -13,9 +14,9 @@ create table if not exists public.transactions (
   ts bigint,
   created_at timestamptz not null default now()
 );
-create index if not exists transactions_user_date on public.transactions (user_id, date);
+create index if not exists hct_transactions_user_date on public.hct_transactions (user_id, date);
 
-create table if not exists public.recurring (
+create table if not exists public.hct_recurring (
   id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   note text not null,
@@ -28,7 +29,7 @@ create table if not exists public.recurring (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.jars (
+create table if not exists public.hct_jars (
   id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   name text not null,
@@ -40,7 +41,7 @@ create table if not exists public.jars (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.debts (
+create table if not exists public.hct_debts (
   id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   person text not null,
@@ -53,7 +54,7 @@ create table if not exists public.debts (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.settings (
+create table if not exists public.hct_settings (
   user_id uuid primary key references auth.users(id) on delete cascade default auth.uid(),
   data jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
@@ -63,9 +64,9 @@ create table if not exists public.settings (
 do $$
 declare t text;
 begin
-  foreach t in array array['transactions','recurring','jars','debts','settings'] loop
+  foreach t in array array['hct_transactions','hct_recurring','hct_jars','hct_debts','hct_settings'] loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists "own rows" on public.%I', t);
-    execute format('create policy "own rows" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+    execute format('drop policy if exists "hct own rows" on public.%I', t);
+    execute format('create policy "hct own rows" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
