@@ -37,6 +37,7 @@ button,input{font:inherit;color:inherit} button{cursor:pointer;border:0;backgrou
 h1,h2{font-family:var(--f-display);margin:0;line-height:1.15;text-wrap:balance}
 .num{font-variant-numeric:tabular-nums}
 .wrap{max-width:640px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+.back{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:14px;background:var(--surface);color:var(--ink);font-weight:600;text-decoration:none;font-size:15px;box-shadow:var(--shadow)}
 .brand{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
 .jar{width:30px;height:30px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:800}
 h1{font-size:30px}
@@ -132,7 +133,7 @@ function newKey(){ const a=new Uint8Array(18); crypto.getRandomValues(a); return
 const token = decodeURIComponent((location.hash||'').slice(1)).trim();
 const myKey = store.get('hct_hen_key',null) || (()=>{ const k=newKey(); store.set('hct_hen_key',k); return k; })();
 let me = { name: store.get('hct_hen_name',''), slots:{}, foods:new Set(), note:'' };
-let M = null, dirty = false, saving = false, sb = null, mine = null, viewWeek = null;
+let M = null, dirty = false, saving = false, sb = null, mine = null, viewWeek = null, hasSession = false;
 const mondayOf = k => { const d=new Date(k+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dayKey(d); };
 const MAX_WEEKS = 8;   // xem trước tối đa 8 tuần
 const weekBounds = () => { const min=mondayOf(dayKey(new Date())); return {min, max:addDays(min,7*MAX_WEEKS)}; };
@@ -142,6 +143,7 @@ function init(){
   if(!token){ $('app').innerHTML='<div class="empty">Link thiếu mã buổi hẹn. Hỏi lại người gửi link nhé.</div>'; return; }
   if(!window.supabase){ $('app').innerHTML='<div class="empty">Không tải được trang. Kiểm tra mạng rồi tải lại.</div>'; return; }
   sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  sb.auth.getSession().then(r=>{ hasSession=!!(r&&r.data&&r.data.session); if(M) render(); }).catch(()=>{});
   load(true);
   setInterval(()=>{ if(!document.hidden && !dirty && !saving) load(false); }, 20000);
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden && !dirty) load(false); });
@@ -184,6 +186,7 @@ function render(){
   const calUrl=ch?(()=>{ const [k,sl]=ch.split('|'), s=SLOTS.find(x=>x[0]===sl)||SLOTS[1], d=k.replace(/-/g,'');
     return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(M.title+(M.chosen_food?' · '+M.chosen_food:''))+'&dates='+d+'T'+s[2].replace(':','')+'00/'+d+'T'+s[3].replace(':','')+'00&ctz=Asia/Ho_Chi_Minh&details='+encodeURIComponent((M.note||'')+'\n'+location.href)+(M.place?'&location='+encodeURIComponent(M.place):''); })():'';
   $('app').innerHTML = `
+  ${hasSession||M.is_owner?`<a class="back" href="index.html#hen">‹ Về Hũ Chi Tiêu</a>`:''}
   <div class="brand"><span class="jar">H</span>Hẹn ăn nhóm · Hũ Chi Tiêu</div>
   <div><h1>${esc(M.title)}</h1><div class="sub">${n} người đã trả lời · chọn được nhiều tuần${M.place?' · 📍 '+esc(M.place):''}</div>
     ${M.note?`<p style="margin:6px 0 0">${esc(M.note)}</p>`:''}</div>
