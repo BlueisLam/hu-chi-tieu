@@ -387,7 +387,7 @@ a.secondary{color:var(--ink);display:block}
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.05-5';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.05-6';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -1285,8 +1285,8 @@ function viewHen(){
   <p class="lbl">Tạo buổi hẹn, gửi link cho cả nhóm. Mỗi người chạm vào khung Sáng/Tối mình rảnh trong tuần và chọn món, ai cũng thấy lịch của nhau. Bạn chốt giờ và món khi đã đủ người.</p>
   ${msg}
   ${!henErr?(henList.length?henList.map(m=>{ const end=addDays(m.week_start,6), past=end<today;
-    return `<section class="card hen-card${past?' is-past':''}"><div class="card-h"><h2>${esc(m.title)}</h2><span class="lbl num">${m.n} người</span></div>
-      <p class="lbl" style="margin:0">Tuần ${fmtD(m.week_start)} – ${fmtD(end)}${m.place?' · 📍 '+esc(m.place):''}</p>
+    return `<section class="card hen-card${m.chosen&&m.chosen.split('|')[0]<today?' is-past':''}"><div class="card-h"><h2>${esc(m.title)}</h2><span class="lbl num">${m.n} người</span></div>
+      <p class="lbl" style="margin:0">Bắt đầu từ tuần ${fmtD(m.week_start)} · chuyển tuần được${m.place?' · 📍 '+esc(m.place):''}</p>
       ${m.chosen?`<p style="margin:0">✅ Chốt <b>${esc(henSlotLabel(m.chosen))}</b>${m.chosen_food?' · '+esc(m.chosen_food):''}</p>`:`<p class="lbl" style="margin:0">${m.n?'Chưa chốt giờ':'Chưa ai trả lời, gửi link cho nhóm nhé'}</p>`}
       <div class="row-acts"><a class="btn-s" href="hen.html#${esc(m.token)}" target="_blank" rel="noopener">Mở lịch nhóm</a><button class="btn-s ghost" data-henshare="${esc(m.token)}" data-hentitle="${esc(m.title)}">Gửi link</button><button class="btn-s ghost" data-hendel="${esc(m.id)}">Xoá</button></div></section>`; }).join('')
     :'<div class="empty">Chưa có buổi hẹn nào. Bấm “＋ Tạo buổi hẹn” để bắt đầu.</div>'):''}`;
@@ -1304,7 +1304,7 @@ function openHenNew(){
     document.querySelectorAll('[data-hw]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.hw===henDraft.week)); };
   openSheet(`${sheetHead('Tạo buổi hẹn')}
   <label class="field">Tên buổi hẹn<input id="ht" value="Ăn uống cùng nhóm" maxlength="60"></label>
-  <div class="sec-l">Tuần</div>
+  <div class="sec-l">Mở lịch từ tuần · mọi người vẫn chuyển sang tuần khác được</div>
   <div class="seg" role="group" aria-label="Tuần">${[0,1,2].map(o=>`<button data-hw="${o}">${['Tuần này','Tuần sau','2 tuần nữa'][o]} <small class="num">${fmtD(weekStart(o))}</small></button>`).join('')}</div>
   <label class="field">Lời nhắn cho nhóm (không bắt buộc)<input id="hn" maxlength="120" placeholder="vd lâu rồi chưa gặp, đi ăn một bữa nha"></label>
   <label class="field">Địa điểm (không bắt buộc, chốt sau cũng được)<input id="hp" maxlength="80" placeholder="vd khu Q.1 hoặc tên quán"></label>
@@ -2127,7 +2127,7 @@ document.addEventListener('click',async e=>{
     case 'hen-refood': henDraft.salt=(henDraft.salt||0)+1; henDraft.foods=henFoodSuggest(4,henDraft.salt); henDraft.paint(); break;
     case 'hen-addfood': { const v=val('hfa').trim(); if(v && henDraft.foods.length<10){ henDraft.foods.push({ten:v,emoji:itemEmoji({note:v,cat:'an'})}); document.getElementById('hfa').value=''; henDraft.paint(); } break; }
     case 'hen-copy': { const inp=document.getElementById('hl'); try{ await navigator.clipboard.writeText(inp.value); toast('Đã sao chép link'); }catch(e){ inp.select(); toast('Bấm giữ để sao chép'); } break; }
-    case 'hen-sharenative': { const url=henLink(A.dataset.tok); try{ if(navigator.share){ await navigator.share({title:A.dataset.title,text:A.dataset.title+': chọn giờ bạn rảnh trong tuần nhé',url}); break; } }catch(e){ if(e&&e.name==='AbortError') break; }
+    case 'hen-sharenative': { const url=henLink(A.dataset.tok); try{ if(navigator.share){ await navigator.share({title:A.dataset.title,text:A.dataset.title+': vào chọn giờ bạn rảnh nhé, cả nhóm đều thấy lịch của nhau',url}); break; } }catch(e){ if(e&&e.name==='AbortError') break; }
       try{ await navigator.clipboard.writeText(url); toast('Đã sao chép link'); }catch(e){ toast('Sao chép link ở ô phía trên'); } break; }
     case 'hen-sql': { const ta=document.getElementById('hensql'); try{ const r=await fetch('supabase/hen.sql',{cache:'no-store'}); const t=await r.text(); ta.value=t; ta.hidden=false;
       try{ await navigator.clipboard.writeText(t); toast('Đã sao chép SQL, dán vào SQL Editor rồi bấm Run'); }catch(e){ ta.select(); toast('Bấm giữ để sao chép SQL'); } }catch(e){ toast('Không tải được SQL'); } break; }

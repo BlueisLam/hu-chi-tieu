@@ -78,6 +78,14 @@ h1{font-size:30px}
 .cell.pick{box-shadow:0 0 0 4px var(--ink)}
 .cell:disabled{opacity:.45;cursor:default}
 @media (prefers-reduced-motion:reduce){.cell{transition:none}}
+.wnav{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px;text-align:center}
+.wnav button{height:44px;border-radius:14px;background:var(--sunk);font-size:22px;font-weight:700}
+.wnav button:disabled{opacity:.3;cursor:default}
+.wnav b{display:block;font-family:var(--f-display);font-size:18px}
+.wnav small{color:var(--muted);font-size:12.5px}
+.wdots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.wdots button{min-width:28px;height:28px;border-radius:9px;background:var(--sunk);font-size:12px;font-weight:700;color:var(--mint-ink)}
+.wdots button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 
 .foods{display:flex;flex-direction:column;gap:8px}
 .food{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:var(--sunk);text-align:left;border:2px solid transparent;width:100%}
@@ -124,7 +132,11 @@ function newKey(){ const a=new Uint8Array(18); crypto.getRandomValues(a); return
 const token = decodeURIComponent((location.hash||'').slice(1)).trim();
 const myKey = store.get('hct_hen_key',null) || (()=>{ const k=newKey(); store.set('hct_hen_key',k); return k; })();
 let me = { name: store.get('hct_hen_name',''), slots:{}, foods:new Set(), note:'' };
-let M = null, dirty = false, saving = false, sb = null, mine = null;
+let M = null, dirty = false, saving = false, sb = null, mine = null, viewWeek = null;
+const mondayOf = k => { const d=new Date(k+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dayKey(d); };
+const MAX_WEEKS = 8;   // xem trước tối đa 8 tuần
+const weekBounds = () => { const min=mondayOf(dayKey(new Date())); return {min, max:addDays(min,7*MAX_WEEKS)}; };
+const weekName = wk => { const d=Math.round((new Date(wk+'T12:00:00')-new Date(weekBounds().min+'T12:00:00'))/864e5/7); return d===0?'Tuần này':d===1?'Tuần sau':d+' tuần nữa'; };
 
 function init(){
   if(!token){ $('app').innerHTML='<div class="empty">Link thiếu mã buổi hẹn. Hỏi lại người gửi link nhé.</div>'; return; }
@@ -139,6 +151,8 @@ async function load(first){
   if(error){ $('app').innerHTML=`<div class="empty">Chưa mở được buổi hẹn.<br><span class="err">${esc(/function|does not exist|schema cache/i.test(error.message)?'Chủ buổi hẹn chưa cài phần Hẹn ăn trên Supabase.':error.message)}</span></div>`; return; }
   if(!data){ $('app').innerHTML='<div class="empty">Không tìm thấy buổi hẹn. Có thể link sai hoặc buổi hẹn đã bị xoá.</div>'; return; }
   M = data;
+  if(!viewWeek){ const b=weekBounds(); const start=M.chosen?mondayOf(M.chosen.split('|')[0]):mondayOf(String(M.week_start).slice(0,10));
+    viewWeek = start<b.min ? b.min : start>b.max ? b.max : start; }
   if(first || !dirty) syncMine();
   render();
 }
@@ -155,7 +169,9 @@ function tally(){
   return {t,all};
 }
 function render(){
-  const {t,all}=tally(), n=all.length, week=[...Array(7)].map((_,i)=>addDays(M.week_start,i)), today=dayKey(new Date());
+  const {t,all}=tally(), n=all.length, week=[...Array(7)].map((_,i)=>addDays(viewWeek,i)), today=dayKey(new Date());
+  const wb=weekBounds(), weeks=[]; for(let w=wb.min; w<=wb.max; w=addDays(w,7)) weeks.push(w);
+  const perWeek={}; Object.entries(t).forEach(([k,o])=>{ const w=mondayOf(k.split('|')[0]); (perWeek[w]=perWeek[w]||new Set()); o.yes.concat(o.maybe).forEach(x=>perWeek[w].add(x)); });
   const ranked=Object.entries(t).map(([k,o])=>({k,...o,score:o.yes.length+o.maybe.length*0.5})).filter(o=>o.score>0 && o.k.split('|')[0]>=today)
     .sort((a,b)=>b.score-a.score||b.yes.length-a.yes.length||a.k.localeCompare(b.k)).slice(0,3);
   const topKey=ranked[0]&&ranked[0].k;
@@ -169,7 +185,7 @@ function render(){
     return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(M.title+(M.chosen_food?' · '+M.chosen_food:''))+'&dates='+d+'T'+s[2].replace(':','')+'00/'+d+'T'+s[3].replace(':','')+'00&ctz=Asia/Ho_Chi_Minh&details='+encodeURIComponent((M.note||'')+'\n'+location.href)+(M.place?'&location='+encodeURIComponent(M.place):''); })():'';
   $('app').innerHTML = `
   <div class="brand"><span class="jar">H</span>Hẹn ăn nhóm · Hũ Chi Tiêu</div>
-  <div><h1>${esc(M.title)}</h1><div class="sub">Tuần ${fmtD(week[0])} – ${fmtD(week[6])} · ${n} người đã trả lời${M.place?' · 📍 '+esc(M.place):''}</div>
+  <div><h1>${esc(M.title)}</h1><div class="sub">${n} người đã trả lời · chọn được nhiều tuần${M.place?' · 📍 '+esc(M.place):''}</div>
     ${M.note?`<p style="margin:6px 0 0">${esc(M.note)}</p>`:''}</div>
   ${ch?`<section class="chosen"><span class="lbl" style="color:inherit">✅ Đã chốt</span><b>${esc(slotLabel(ch))}</b>
     ${M.chosen_food?`<span>Ăn <b style="font-size:inherit;font-family:inherit">${esc(M.chosen_food)}</b></span>`:''}
@@ -185,6 +201,10 @@ function render(){
       <b class="num">${o.yes.length}/${n}</b></div>`).join('')}</div></section>`:''}
   <section class="card">
     <h2>Lịch tuần</h2>
+    <div class="wnav"><button data-wk="-1" aria-label="Tuần trước" ${viewWeek<=wb.min?'disabled':''}>‹</button>
+      <div><b>${weekName(viewWeek)}</b><small class="num">${fmtD(week[0])} – ${fmtD(week[6])}${perWeek[viewWeek]?' · '+perWeek[viewWeek].size+' người đã chọn':''}</small></div>
+      <button data-wk="1" aria-label="Tuần sau" ${viewWeek>=wb.max?'disabled':''}>›</button></div>
+    <div class="wdots" role="group" aria-label="Chọn tuần">${weeks.map(w=>`<button data-wjump="${w}" aria-pressed="${w===viewWeek}" aria-label="${weekName(w)}${perWeek[w]?', '+perWeek[w].size+' người':''}" title="${weekName(w)}">${perWeek[w]?perWeek[w].size:''}</button>`).join('')}</div>
     <div class="legend"><span><i style="background:var(--heat1)"></i>nhiều người rảnh</span><span><i style="border:2.5px solid var(--mint-ink)"></i>bạn rảnh</span><span><i style="border:2.5px dashed var(--warn)"></i>bạn có thể</span></div>
     <p class="lbl" style="margin:0">Chạm một lần: rảnh ✓ · lần hai: có thể ? · lần ba: bỏ.</p>
     <div class="grid" role="grid" aria-label="Lịch tuần">
@@ -229,6 +249,8 @@ function bind(){
     if(!me.name){ toast('Nhập tên của bạn trước nhé'); $('nm').focus(); return; }
     const k=b.dataset.cell, cur=me.slots[k]; if(!cur) me.slots[k]='yes'; else if(cur==='yes') me.slots[k]='maybe'; else delete me.slots[k];
     dirty=true; render(); scheduleSave(); });
+  document.querySelectorAll('[data-wk]').forEach(b=>b.onclick=()=>{ const w=addDays(viewWeek,7*+b.dataset.wk), wb=weekBounds(); if(w<wb.min||w>wb.max) return; viewWeek=w; render(); });
+  document.querySelectorAll('[data-wjump]').forEach(b=>b.onclick=()=>{ viewWeek=b.dataset.wjump; render(); });
   document.querySelectorAll('[data-food]').forEach(b=>b.onclick=()=>{
     if(!me.name){ toast('Nhập tên của bạn trước nhé'); $('nm').focus(); return; }
     const f=b.dataset.food; me.foods.has(f)?me.foods.delete(f):me.foods.add(f); dirty=true; render(); scheduleSave(); });
@@ -252,7 +274,10 @@ $('savebtn').onclick=()=>{ clearTimeout(saveT); save(); };
 async function save(){
   if(!me.name || saving) return;
   saving=true; updateBar();
-  const slots=Object.entries(me.slots).map(([k,v])=>v==='maybe'?'?'+k:k);
+  const today=dayKey(new Date());
+  Object.keys(me.slots).forEach(k=>{ if(k.split('|')[0]<today) delete me.slots[k]; });
+  let slots=Object.entries(me.slots).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>v==='maybe'?'?'+k:k);
+  if(slots.length>40){ slots=slots.slice(0,40); toast('Mỗi người chọn tối đa 40 khung, đã giữ 40 khung gần nhất',3500); }
   const {data,error}=await sb.rpc('hct_meet_vote',{p_token:token,p_name:me.name,p_key:myKey,p_slots:slots,p_foods:[...me.foods],p_note:me.note});
   saving=false;
   if(error){ toast(error.message.replace(/^.*?: /,''),4000); updateBar(); return; }
@@ -264,7 +289,7 @@ async function ownerUpdate(patch,msg){
   toast(msg); load(false);
 }
 async function shareLink(){
-  const url=location.href, text=`${M.title}: chọn giờ bạn rảnh tuần ${fmtD(M.week_start)} – ${fmtD(addDays(M.week_start,6))} nhé`;
+  const url=location.href, text=`${M.title}: vào chọn giờ bạn rảnh nhé, cả nhóm đều thấy lịch của nhau`;
   try{ if(navigator.share){ await navigator.share({title:M.title,text,url}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
   try{ await navigator.clipboard.writeText(url); toast('Đã sao chép link'); }catch(e){ prompt('Sao chép link này:',url); }
 }
