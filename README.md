@@ -93,6 +93,14 @@ Test hàm máy chủ (giả lập, không gọi mạng): `node test/goi-y.test.m
 - **Gợi ý quán gần bạn** (Cài đặt → Khẩu vị): khi bấm Hỏi AI, app gửi vị trí làm tròn khoảng 100 m, Gemini dùng Google Maps để chọn quán có thật trong khoảng 3 km, kèm link quán. Nếu tính năng Google Maps của Gemini lỗi, app tự gợi ý như thường. Dùng chung `GEMINI_API_KEY`, không cần key Google Maps riêng.
 - Dữ liệu lưu trong `hct_settings.data` (`menu`, `places`) nên không cần thêm cột Supabase.
 
+## Ví & số dư
+
+Kế hoạch → **Ví & số dư**: tiền mặt, ngân hàng/ví điện tử, sổ tiết kiệm, thẻ tín dụng. Nhập số dư hiện tại một lần, sau đó app tự tính: số dư − khoản chi ghi sau đó bằng ví này + tiền vào − tiền ra/chuyển đi.
+- Thẻ tín dụng: quẹt thẻ vẫn là chi tiêu trong tháng nhưng cộng vào **dư nợ thẻ**, không trừ ví. "Trả thẻ" = chuyển từ ngân hàng sang thẻ, không tính là chi lần hai. Đặt ngày phải trả để Tổng quan nhắc trước 5 ngày.
+- Tiền đi mượn (vd mượn mẹ) nằm trong "Đang có", được trừ ở "Thực sự của bạn". Ghi khoản vay có chọn ví thì lúc bấm "Đã trả" app tự trừ ví đó.
+- Gõ tên ví hoặc từ khoá khi ghi chi: `phở 50k vcb`, `giày 1tr2 visa`.
+- Dữ liệu nằm trong `hct_settings.data.accounts` và `.moves`, không cần chạy SQL mới.
+
 ## Hẹn ăn nhóm
 
 - Trong app: **Kế hoạch → Hẹn ăn nhóm** (hoặc nút 📅 Hẹn nhóm khi chọn "Nhóm" trong thẻ Hôm nay ăn gì). Tạo buổi hẹn gồm tên, tuần, lời nhắn, địa điểm và món gợi ý cho nhóm, rồi gửi link `hen.html#<mã>` vào nhóm chat.
