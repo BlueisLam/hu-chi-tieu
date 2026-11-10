@@ -297,6 +297,8 @@ a.secondary{color:var(--ink);display:block}
 
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(40,20,40,.35);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet>*{flex-shrink:0}
+.sheet .filters.fwrap{flex-wrap:wrap;overflow:visible}
 .sheet{width:100%;max-width:560px;background:var(--bg);border-radius:28px 28px 0 0;padding:10px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px;max-height:92%;overflow-y:auto;animation:up .22s ease-out}
 @keyframes up{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}.switch,.switch::after{transition:none}}
@@ -407,7 +409,7 @@ a.secondary{color:var(--ink);display:block}
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.10-1';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.10-2';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -1865,7 +1867,7 @@ function openRate(id){
   <div class="sec-l">Điểm · <span id="rs-txt">${SCORE_TXT(score)}</span></div>
   <div class="score" id="rs">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button data-sc="${n}" aria-pressed="${n===score}">${n}</button>`).join('')}</div>
   <div class="sec-l">Ẩm thực</div>
-  <div class="filters" id="rc">${Object.entries(CUISINES).map(([k,v])=>`<button class="pill" data-rc="${k}" aria-pressed="${k===cui}">${v.f} ${v.n}</button>`).join('')}</div>
+  <div class="filters fwrap" id="rc">${Object.entries(CUISINES).map(([k,v])=>`<button class="pill" data-rc="${k}" aria-pressed="${k===cui}">${v.f} ${v.n}</button>`).join('')}</div>
   <label class="field">Nhận xét ngắn<input id="rv" value="${esc(r.review||'')}" maxlength="120" placeholder="vd nước dùng đậm, hơi mặn, phục vụ nhanh"></label>
   <label class="field">Link Google Maps của quán (không bắt buộc)<input id="rmap" inputmode="url" value="${esc((r.place&&placeInfo(r.place)||{}).url||'')}" placeholder="Dán link chia sẻ từ Google Maps"></label>
   <p class="lbl">AI dùng điểm này để gợi ý quay lại quán ngon và tránh quán dở.</p>
