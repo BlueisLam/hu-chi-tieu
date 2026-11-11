@@ -409,7 +409,7 @@ a.secondary{color:var(--ink);display:block}
 /* ============ CẤU HÌNH ============
    Điền 2 giá trị từ Supabase → Project Settings → API.
    Hoặc để trống và nhập trong app: Cài đặt → Kết nối cloud. */
-const APP_VERSION = '2026.11.10-2';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
+const APP_VERSION = '2026.11.11-1';   // tăng mỗi lần sửa để máy người dùng biết có bản mới
 const CONFIG = { SUPABASE_URL: 'https://aawhgpfmbkjytjuuygwa.supabase.co', SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhd2hncGZtYmtqeXRqdXV5Z3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDE3MjUsImV4cCI6MjEwODkxNzcyNX0.7JW812XdDPl4sUtiu1YqnSJKb1ce1FtfRRwX31JmN5s' };
 
 /* ============ hằng số ============ */
@@ -475,6 +475,10 @@ if(!S){
   const ol = store.get('hct_learn',null); if(ol) S.settings.learned = ol;
 }
 S.settings = Object.assign(blankSettings(), S.settings||{});
+const debtWallet = d => d && ((S.settings.debtWallet||{})[d.id] || d.wallet) || null;
+let debtWalletMig=false;
+(S.debts||[]).forEach(d=>{ if(d.wallet){ if(!(S.settings.debtWallet||{})[d.id]){ (S.settings.debtWallet||(S.settings.debtWallet={}))[d.id]=d.wallet; debtWalletMig=true; } delete d.wallet; } });
+function setDebtWallet(id, w){ const m=S.settings.debtWallet||(S.settings.debtWallet={}); if(w) m[id]=w; else delete m[id]; }
 let Q = store.get(LS.q,[]);
 let mode='local', sb=null, user=null, syncErr='', flushing=false, flushTimer=null, lastSync=null;
 const persist = () => store.set(LS.data,S);
@@ -516,7 +520,7 @@ async function flush(){
   const snap=[...Q];
   try{
     for(const k of Object.keys(TABLE)){
-      const ups = snap.filter(o=>o.k===k&&o.op==='up').map(o=>S[k].find(x=>x.id===o.id)).filter(Boolean).map(({sample,...r})=>({...r,user_id:user.id}));
+      const ups = snap.filter(o=>o.k===k&&o.op==='up').map(o=>S[k].find(x=>x.id===o.id)).filter(Boolean).map(({sample,...r})=>{ if(k==='debts') delete r.wallet; return {...r,user_id:user.id}; });
       if(ups.length){ const {error}=await sb.from(TABLE[k]).upsert(ups); if(error) throw error; }
       const dels = snap.filter(o=>o.k===k&&o.op==='del').map(o=>o.id);
       if(dels.length){ const {error}=await sb.from(TABLE[k]).delete().in('id',dels); if(error) throw error; }
@@ -1984,8 +1988,8 @@ function openJar(id){
 
 /* --- cho mượn / đi vay --- */
 function settleDebt(d){
-  if(!d.wallet || !accById(d.wallet)) return;
-  addMove(d.kind==='borrow'?{from:d.wallet,amount:d.amount,note:'Trả '+d.person}:{to:d.wallet,amount:d.amount,note:d.person+' trả tiền'});
+  const w=debtWallet(d); if(!w || !accById(w)) return;
+  addMove(d.kind==='borrow'?{from:w,amount:d.amount,note:'Trả '+d.person}:{to:w,amount:d.amount,note:d.person+' trả tiền'});
 }
 function openDebt(id){
   const d=S.debts.find(x=>x.id===id)||{id:uuid(),person:'',amount:0,kind:'lend',due:null,paid:false,note:'',ts:Date.now()};
@@ -1994,7 +1998,7 @@ function openDebt(id){
   <div class="seg" role="group" aria-label="Loại" id="k-seg"><button data-k="lend" aria-pressed="${kind==='lend'}">Mình cho mượn</button><button data-k="borrow" aria-pressed="${kind==='borrow'}">Mình đi vay</button></div>
   <div class="row2"><label class="field">Người<input id="k-p" value="${esc(d.person)}" placeholder="vd Minh"></label><label class="field">Số tiền<input id="k-a" inputmode="decimal" value="${d.amount?fmt(d.amount):''}" placeholder="vd 500k"></label></div>
   <div class="row2"><label class="field">Hạn trả<input id="k-due" type="date" value="${d.due||''}"></label><label class="field">Ghi chú<input id="k-n" value="${esc(d.note)}"></label></div>
-  <label class="field"><span id="k-wl">${kind==='borrow'?'Tiền mượn nằm ở ví':'Tiền cho mượn lấy từ ví'}</span><select id="k-w"><option value="">${isNew?'Không ghi vào ví (số dư đã tính rồi)':'Không gắn ví'}</option>${accOpts(d.wallet||'',a=>a.kind!=='credit')}</select></label>
+  <label class="field"><span id="k-wl">${kind==='borrow'?'Tiền mượn nằm ở ví':'Tiền cho mượn lấy từ ví'}</span><select id="k-w"><option value="">${isNew?'Không ghi vào ví (số dư đã tính rồi)':'Không gắn ví'}</option>${accOpts(debtWallet(d)||'',a=>a.kind!=='credit')}</select></label>
   ${isNew?'<p class="lbl" style="margin:0">Chọn ví nếu tiền vừa mới nhận/đưa và bạn chưa cập nhật số dư. Khi đánh dấu “Đã trả”, app tự trừ/cộng lại ví này.</p>':''}
   ${isNew?'':`<div class="set-row"><div class="t"><b>Đã trả xong</b></div><button class="switch" role="switch" id="k-paid" aria-checked="${!!d.paid}" aria-label="Đã trả xong"></button></div>`}
   <button class="primary" id="k-save">Lưu</button>${isNew?'':'<button class="danger" id="k-del">Xoá</button>'}`);
@@ -2004,9 +2008,10 @@ function openDebt(id){
   document.getElementById('k-save').onclick=()=>{
     const amount=parseAmount(val('k-a')), person=val('k-p').trim(); if(!person||!amount){ toast('Cần tên người và số tiền'); return; }
     const wallet=val('k-w')||null, paid=pb?pb.getAttribute('aria-checked')==='true':false;
-    const nd={...d,kind,person,amount,due:val('k-due')||null,note:val('k-n').trim(),paid,wallet};
+    const nd={...d,kind,person,amount,due:val('k-due')||null,note:val('k-n').trim(),paid}; delete nd.wallet;
+    if(wallet!==debtWallet(d)){ setDebtWallet(nd.id,wallet); saveSettings(); }
     if(isNew && wallet) addMove(kind==='borrow'?{to:wallet,amount,note:'Mượn '+person}:{from:wallet,amount,note:'Cho '+person+' mượn'});
-    if(!d.paid && paid) settleDebt(nd);
+    if(!d.paid && paid) settleDebt({...nd,wallet});
     put('debts',nd); toast('Đã lưu'); closeSheet();
   };
   const del=document.getElementById('k-del'); if(del) armDelete(del,()=>{ remove('debts',d.id); toast('Đã xoá'); closeSheet(); });
@@ -2244,6 +2249,7 @@ async function onLogin(u, fresh){
     // cài đặt: không đẩy đè lên tài khoản đã có; pull() tự tải lên nếu cloud chưa có
   }
   store.set(LS.owner,u.id);
+  if(debtWalletMig){ debtWalletMig=false; persist(); enqueue({k:'settings',op:'up',id:'settings'}); }
   render();
   await pull();
   if(location.hash==='#nhap' && !locked) openAdd();
